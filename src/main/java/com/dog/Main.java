@@ -2,10 +2,8 @@ package com.dog;
 
 import com.dog.net.*;
 
-public class Main
-{
-    public static void main(String[] args)
-    {
+public class Main {
+    public static void main(String[] args) {
         if (args.length > 0) {
             System.out.println("Starting server...");
             try (var server = new Server(5000, 2)) {

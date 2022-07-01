@@ -12,8 +12,7 @@ public class Card {
     private final Suit mSuit;
     private final Face mFace;
 
-    public Card(Suit suit, Face face)
-    {
+    public Card(Suit suit, Face face) {
         mSuit = suit;
         mFace = face;
     }
