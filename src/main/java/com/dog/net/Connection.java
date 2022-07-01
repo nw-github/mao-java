@@ -3,56 +3,58 @@ package com.dog.net;
 import java.io.*;
 import java.net.Socket;
 
-public abstract class Connection implements AutoCloseable, Runnable {
+import com.dog.Utils;
+
+public class Connection implements Runnable {
     private Socket mSocket;
     private DataInputStream mInput;
     private DataOutputStream mOutput;
+    private ConnectionHandler mHandler;
 
-    public Connection(Socket socket) throws IOException {
-        mSocket = socket;
-        mInput  = new DataInputStream(mSocket.getInputStream());
-        mOutput = new DataOutputStream(mSocket.getOutputStream());
+    public Connection(ConnectionHandler handler, Socket socket) throws IOException {
+        mHandler = handler;
+        mSocket  = socket;
+        mInput   = new DataInputStream(mSocket.getInputStream());
+        mOutput  = new DataOutputStream(mSocket.getOutputStream());
     }
-
-    public abstract void recv(String type, byte[] data) throws IOException;
 
     @Override
-    public void close() {
-        if (isConnected()) {
-            System.out.printf("Connection from %s:%d closing.\n",
-                mSocket.getInetAddress().toString(), mSocket.getPort());
-
-            try {
-                mInput.close();
-                mOutput.close();
-                mSocket.close();
-            } catch (IOException ex) {}
-        }
-    }
-
     public void run() {
         while (isConnected()) {
             try {
                 String type = mInput.readUTF();
-                int length  = mInput.readInt(); // TODO: length verification/max
+                int length  = mInput.readInt();
                 byte[] data = null;
                 if (length > 0)
                     data = mInput.readNBytes(length);
 
-                recv(type, data);
+                mHandler.onRecvMessage(this, new Message(type, data));
             } catch (IOException ex) {
                 System.out.printf("IOException when reading: %s\n", ex.toString());
-                close();
+                stop();
             }
         }
     }
 
-    public void send(String type, byte[] data) {
+    public void stop() {
+        if (isConnected()) {
+            mHandler.onClose(this);
+
+            Utils.close(mInput);
+            Utils.close(mOutput);
+            Utils.close(mSocket);
+        }
+    }
+
+    // TODO: better message system
+    public void send(Message message) {
         if (!isConnected())
             return;
 
         try {
-            mOutput.writeUTF(type);
+            mOutput.writeUTF(message.type());
+            
+            var data = message.data();
             if (data != null && data.length != 0) {
                 mOutput.writeInt(data.length);
                 mOutput.write(data);
@@ -61,15 +63,15 @@ public abstract class Connection implements AutoCloseable, Runnable {
             }
         } catch (IOException ex) {
             System.out.printf("IOException when sending: %s\n", ex.toString());
-            close();
+            stop();
         }
-    }
-
-    public void send(Object type, byte[] data) {
-        send(type.toString(), data);
     }
 
     public boolean isConnected() {
         return mSocket != null && !mSocket.isClosed();
+    }
+
+    public Socket getSocket() {
+        return mSocket;
     }
 }

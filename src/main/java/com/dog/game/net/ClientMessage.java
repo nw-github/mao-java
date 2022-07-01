@@ -1,4 +1,4 @@
-package com.dog.net;
+package com.dog.game.net;
 
 // Client -> Server
 public enum ClientMessage {

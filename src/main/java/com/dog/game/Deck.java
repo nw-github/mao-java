@@ -9,7 +9,7 @@ public class Deck extends ArrayList<Card> {
     }
 
     public void take(Deck source) {
-        add(0, source.remove(0));
+        take(source, 0);
     }
 
     public void shuffle() {

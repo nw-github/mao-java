@@ -2,45 +2,61 @@ package com.dog.net;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.net.UnknownHostException;
 
-public class Client implements AutoCloseable, Runnable {
+import com.dog.Utils;
+
+public abstract class Client implements Runnable, ConnectionHandler {
+    private final String mHost;
+    private final int mPort;
+    private final int mMaxAttepts;
+    private final int mTimeout;
+
     private Connection mConn;
 
-    public Client(String host, int port, int maxAttempts, int timeout) throws UnknownHostException, IOException {
-        int attempts = 0;
-        while (true) {
-            try {
-                var socket = new Socket(host, port);
-                mConn = new ClientConnection(socket);
-                break;
-            } catch (IOException ex) {
-                if (attempts == maxAttempts)
-                    throw ex;
+    public Client(String host, int port, int maxAttempts, int timeout) {
+        mHost       = host;
+        mPort       = port;
+        mMaxAttepts = maxAttempts;
+        mTimeout    = timeout;
+    }
 
-                attempts++;
-                Utils.sleep(timeout);
+    public abstract void onConnect();
+    public abstract void onDisconnect();
+
+    @Override
+    public void onClose(Connection conn) {
+        onDisconnect();
+    }
+
+    @Override
+    public void run() {
+        if (isRunning())
+            return;
+
+        for (int i = 0; i < mMaxAttepts; i++) {
+            try {
+                var socket = new Socket(mHost, mPort);
+                mConn = new Connection(this, socket);
+                onConnect();
+                mConn.run();
+                return;
+            } catch (IOException ex) {
+                Utils.sleep(mTimeout);
                 continue;
             }
         }
     }
 
-    @Override
-    public void close() throws Exception {
-        mConn.close();
+    public void stop() {
+        mConn.stop();
+        mConn = null;
     }
 
-    public void run() {
-        Thread thr = new Thread(mConn);
-        thr.start();
+    public void send(Message message) {
+        mConn.send(message);
+    }
 
-        mConn.send(ClientMessage.LOG_IN, new byte[] {
-            (byte)0xDE, (byte)0xAD, (byte)0xBE, (byte)0xEF });
-
-        try {
-            thr.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+    public boolean isRunning() {
+        return mConn != null;
     }
 }
