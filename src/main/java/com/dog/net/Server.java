@@ -52,7 +52,7 @@ public abstract class Server implements Runnable, ConnectionHandler {
                     System.out.printf("Rejected connection from %s:%d!\n",
                         socket.getInetAddress().toString(), socket.getPort());
 
-                    conn.stop();
+                    conn.disconnect();
                 }
             } catch (IOException ex) {
                 System.out.printf("Exception while accepting client: '%s'!\n", ex.toString());
@@ -63,7 +63,7 @@ public abstract class Server implements Runnable, ConnectionHandler {
 
     public void stop() {
         for (var conn : mConns)
-            conn.stop();
+            conn.disconnect();
         
         mConns.clear();
         Utils.close(mSocket);

@@ -31,12 +31,12 @@ public class Connection implements Runnable {
                 mHandler.onRecvMessage(this, new Message(type, data));
             } catch (IOException ex) {
                 System.out.printf("IOException when reading: %s\n", ex.toString());
-                stop();
+                disconnect();
             }
         }
     }
 
-    public void stop() {
+    public void disconnect() {
         if (isConnected()) {
             mHandler.onClose(this);
 
@@ -63,7 +63,7 @@ public class Connection implements Runnable {
             }
         } catch (IOException ex) {
             System.out.printf("IOException when sending: %s\n", ex.toString());
-            stop();
+            disconnect();
         }
     }
 

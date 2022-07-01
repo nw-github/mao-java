@@ -30,6 +30,19 @@ public class Main {
                 for (byte b : data)
                     System.out.printf("0x%02X, ", b);
                 System.out.println();
+
+                try {
+                    String str = message.readString();
+                    int i = message.readInt();
+
+                    System.out.printf("[%s:%d] String: '%s' Int: '%d' \n",
+                        source.getSocket().getInetAddress().toString(),
+                        source.getSocket().getPort(),
+                        str,
+                        i);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
 
             @Override
@@ -51,8 +64,9 @@ public class Main {
             public void onConnect() {
                 System.out.println("Connected to server!");
 
-                send(new Message(ClientMessage.LOG_IN, new byte[] {
-                    (byte)0xDE, (byte)0xAD, (byte)0xBE, (byte)0xEF }));
+                send(new Message(ClientMessage.LOG_IN)
+                    .writeString("Test String")
+                    .writeInt(100));
             }
 
             @Override

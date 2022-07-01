@@ -48,7 +48,7 @@ public abstract class Client implements Runnable, ConnectionHandler {
     }
 
     public void stop() {
-        mConn.stop();
+        mConn.disconnect();
         mConn = null;
     }
 
