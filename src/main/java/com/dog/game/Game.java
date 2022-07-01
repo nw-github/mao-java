@@ -12,13 +12,12 @@ public class Game {
     private int      mPlayOrder = +1; // +1 for clockwise, -1 for counterclockwise
     private Player[] mPlayers;
     
-    public Game(int players)
-    {
+    public Game(int players) {
         mPlayers = new Player[players]; // TODO: players will probably be passed in as an argument when networking is done
 
         for (var suit : Suit.values())
             for (var face : Face.values())
-            mDeck.add(new Card(suit, face));
+                mDeck.add(new Card(suit, face));
 
         mDeck.shuffle();
         mDiscard.take(mDeck);
@@ -28,21 +27,18 @@ public class Game {
                 player.cards.take(mDeck);
     }
 
-    private boolean isValidMove(Card card)
-    {
+    private boolean isValidMove(Card card) {
         return (card.getFace() == mDiscard.top().getFace()) ||
             (card.getSuit() == mDiscard.top().getSuit());
     }
 
-    private void punish(Player player, String reason)
-    {
+    private void punish(Player player, String reason) {
         player.cards.take(mDeck);
 
         // TODO: broadcast the reason in chat? 
     }
 
-    private void nextTurn()
-    {
+    private void nextTurn() {
         mTurn += mPlayOrder;
         if (mTurn < 0)
             mTurn = mPlayers.length - 1;
@@ -50,10 +46,8 @@ public class Game {
             mTurn = 0;
     }
 
-    private void checkRequirePhrase(Player player, Card card)
-    {
-        switch (card.getFace())
-        {
+    private void checkRequirePhrase(Player player, Card card) {
+        switch (card.getFace()) {
         case JACK:
             player.phrase = "here comes the badger";
             break;
@@ -67,10 +61,8 @@ public class Game {
             break;
         }
 
-        if (card.getSuit() == Suit.SPADES)
-        {
-            switch (card.getFace())
-            {
+        if (card.getSuit() == Suit.SPADES) {
+            switch (card.getFace()) {
             case JACK:
             case QUEEN:
             case KING:
@@ -90,10 +82,8 @@ public class Game {
         
         // --------------------------
         
-        if (player.phrase != null)
-        {
-            if (player.checkThread != null)
-            {
+        if (player.phrase != null) {
+            if (player.checkThread != null) {
                 try {
                     var thr = player.checkThread;
                     thr.interrupt();
@@ -110,8 +100,7 @@ public class Game {
                     //       to sleeping if it did
                 }
 
-                if (player.phrase != null)
-                {
+                if (player.phrase != null) {
                     punish(player, String.format("Failure to say '%s'.", player.phrase));
                     player.phrase = null;
                 }
@@ -123,8 +112,7 @@ public class Game {
         }
     }
 
-    public void play(Player player, int cardIndex) throws IllegalArgumentException
-    {
+    public void play(Player player, int cardIndex) throws IllegalArgumentException {
         int index = Arrays.asList(mPlayers).indexOf(player);
         if (index == -1 || cardIndex >= player.cards.size())
             throw new IllegalArgumentException("Player or card index is invalid.");
@@ -133,14 +121,12 @@ public class Game {
         var valid = isValidMove(card);
 
         mDiscard.take(player.cards, cardIndex);
-        if (index != mTurn)
-        {
+        if (index != mTurn) {
             punish(player, "Playing out of turn.");
             return;
         }
 
-        if (!valid)
-        {
+        if (!valid) {
             punish(player, "...");  // TODO: i dont remember what the reason given for an invalid move usually is
             return;
         }
