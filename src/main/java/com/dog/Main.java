@@ -1,92 +1,23 @@
 package com.dog;
 
-import com.dog.game.net.ClientMessage;
-import com.dog.net.*;
+import java.util.concurrent.ThreadLocalRandom;
+
+import com.dog.game.net.GameClient;
+import com.dog.game.net.GameServer;
 
 public class Main {
     public static void runServer(int port) {
-        System.out.println("Starting server...");
+        System.out.printf("Starting server on port %d...\n", port);
 
-        var server = new Server(port) {
-            @Override
-            public boolean onConnect(Connection conn) {
-                System.out.printf("Connection from %s:%d connected.\n",
-                    conn.getSocket().getInetAddress().toString(),
-                    conn.getSocket().getPort());
-
-                return getConnections().size() < 2;
-            }
-
-            @Override
-            public void onRecvMessage(Connection source, Message message) {
-                var data = message.data();
-
-                System.out.printf("[%s:%d] Received a %d byte message of type '%s': \n",
-                    source.getSocket().getInetAddress().toString(),
-                    source.getSocket().getPort(),
-                    data != null ? data.length : 0,
-                    message.type());
-                    
-                for (byte b : data)
-                    System.out.printf("0x%02X, ", b);
-                System.out.println();
-
-                try {
-                    String str = message.readString();
-                    int i = message.readInt();
-
-                    System.out.printf("[%s:%d] String: '%s' Int: '%d' \n",
-                        source.getSocket().getInetAddress().toString(),
-                        source.getSocket().getPort(),
-                        str,
-                        i);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-
-            @Override
-            public void onDisconnect(Connection source) {
-                System.out.printf("Connection from %s:%d disconnected.\n",
-                    source.getSocket().getInetAddress().toString(),
-                    source.getSocket().getPort());
-            }
-        };
-
+        var server = new GameServer(5000, 2);
         server.run();
     }
 
     public static void runClient(String host, int port) {
-        System.out.println("Starting client...");
+        final var name = "Player" + ThreadLocalRandom.current().nextInt(1000, 9999);
+        System.out.printf("Connecting to %s:%d with name '%s'...\n", host, port, name);
 
-        var client = new Client(host, port, 5, 2000) {
-            @Override
-            public void onConnect() {
-                System.out.println("Connected to server!");
-
-                send(new Message(ClientMessage.LOG_IN)
-                    .writeString("Test String")
-                    .writeInt(100));
-            }
-
-            @Override
-            public void onRecvMessage(Connection source, Message message) {
-                var data = message.data();
-
-                System.out.printf("Received a %d byte message of type '%s': \n",
-                    data != null ? data.length : 0, message.type());
-
-                for (byte b : data)
-                    System.out.printf("0x%02X, ", b);
-                System.out.println();
-            }
-
-            @Override
-            public void onDisconnect() {
-                System.out.println("Disconnected from server!");
-            }
-        };
-
+        var client = new GameClient(name, host, port, 5, 2000);
         client.run();
     }
 

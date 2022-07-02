@@ -2,7 +2,8 @@ package com.dog.game.net;
 
 // Server -> Client
 public enum ServerMessage {
-    ACCEPTED,
-    REJECTED,
-    CLOSE
+    ACCEPTED,     // ClientGame
+    PLAYER_JOIN,  // String player
+    PLAYER_LEAVE, // int id
+    GAME_START,   // ClientGame
 };

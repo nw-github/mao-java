@@ -7,10 +7,13 @@ public class Player {
     private final Connection mConn;
     private final String     mName;
     private final Deck       mCards = new Deck();
+    private final int        mId;
+    private boolean          mIsDealer = false;
 
-    public Player(Connection conn, String name) {
+    public Player(Connection conn, int id, String name) {
         mConn  = conn;
         mName  = name;
+        mId    = id;
     }
 
     public Deck getCards() {
@@ -19,5 +22,26 @@ public class Player {
 
     public String getName() {
         return mName;
+    }
+
+    public int getId() {
+        return mId;
+    }
+
+    public boolean isDealer() {
+        return mIsDealer;
+    }
+
+    public Connection getConnection() {
+        return mConn;
+    }
+
+    public void setDealer(boolean isDealer) {
+        mIsDealer = isDealer;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%d:%s:%d", getId(), getName(), getCards().size());
     }
 }

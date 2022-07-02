@@ -9,7 +9,7 @@ public record Card(Suit suit, Face face) {
     public static Card fromString(String source) {
         var parts = source.split(":");
         if (parts.length != 2)
-            return null;
+            throw new IllegalArgumentException("The source string cannot be parsed into a Card.");
 
         return new Card(Suit.valueOf(parts[0]), Face.valueOf(parts[1]));
     }
