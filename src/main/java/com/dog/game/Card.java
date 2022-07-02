@@ -1,9 +1,16 @@
 package com.dog.game;
 
-enum Suit { HEARTS, DIAMONDS, SPADES, CLUBS };
-enum Face { A, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING };
+public record Card(Suit suit, Face face) {
+    @Override
+    public String toString() {
+        return String.format("%s:%s", suit().toString(), face().toString());
+    }
 
-public record Card(
-    Suit suit,
-    Face face
-) { }
+    public static Card fromString(String source) {
+        var parts = source.split(":");
+        if (parts.length != 2)
+            return null;
+
+        return new Card(Suit.valueOf(parts[0]), Face.valueOf(parts[1]));
+    }
+}
