@@ -2,8 +2,12 @@ package com.dog;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+
 import com.dog.game.net.GameClient;
 import com.dog.game.net.GameServer;
+import com.dog.ui.Application;
 
 public class Main {
     public static void runServer(int port) {
@@ -22,10 +26,18 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        if (args.length > 0) {
-            runServer(5000);
-        } else {
-            runClient("127.0.0.1", 5000);
-        }
+        // if (args.length > 0) {
+        //     runServer(5000);
+        // } else {
+        //     runClient("127.0.0.1", 5000);
+        // }
+
+        var config = new Lwjgl3ApplicationConfiguration();
+        config.setForegroundFPS(0);
+        config.useVsync(true);
+        config.setTitle("Mao");
+        config.setWindowedMode(800, 480);
+
+        new Lwjgl3Application(new Application(), config);
     }
 }
