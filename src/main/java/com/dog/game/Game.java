@@ -39,13 +39,15 @@ public class Game {
             (card.suit() == mDiscard.top().suit());
     }
 
-    private void nextTurn() {
-        mTurn += mPlayOrder;
-        if (mTurn < 0)
-            mTurn = mPlayers.length - 1;
-        if (mTurn == mPlayers.length)
-            mTurn = 0;
+    private int nextPlayer() {
+        int turn = mTurn + mPlayOrder;
+        if (turn < 0)
+            turn = mPlayers.length - 1;
+        if (turn == mPlayers.length)
+            turn = 0;
+        return turn;
     }
+
 
     public void play(Player player, int cardIndex) throws IllegalArgumentException {
         int index = Arrays.asList(mPlayers).indexOf(player);
@@ -58,18 +60,31 @@ public class Game {
         mDiscard.take(player.getCards(), cardIndex);
         if (index != mTurn) {
             punish(player, "Playing out of turn.");
-            return;
         }
 
         if (!valid) {
             punish(player, "Wrong card.");  // TODO: i dont remember what the reason given for an invalid move usually is
-            return;
         }
+
+        if(card.face() == Face.JACK){
+            mPlayOrder = mPlayOrder == +1 ? -1 : +1;
+        }
+
+        if(card.face() == Face.SEVEN){
+            punish(mPlayers[nextPlayer()], "Have a nice day!");
+        }
+
+        if(card.face() == Face.A){
+            mTurn = nextPlayer();
+        }
+
+
+
 
         // TODO: other rules i cant remember the specifics of right now:
         //       there's a face that reverses the order of play
         //       there's a face that gives someone a card
 
-        nextTurn();
+        mTurn = nextPlayer();
     }
 }
