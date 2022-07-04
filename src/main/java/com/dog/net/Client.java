@@ -35,14 +35,13 @@ public abstract class Client implements Runnable, ConnectionHandler {
 
         for (int i = 0; i < mMaxAttepts; i++) {
             try {
-                var socket = new Socket(mHost, mPort);
-                mConn = new Connection(this, socket);
+                mConn = new Connection(this, new Socket(mHost, mPort));
                 onConnect();
                 mConn.run();
+                mConn = null;
                 return;
             } catch (IOException ex) {
                 Utils.sleep(mTimeout);
-                continue;
             }
         }
     }

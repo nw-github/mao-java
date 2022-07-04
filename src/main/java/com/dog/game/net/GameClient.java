@@ -59,9 +59,7 @@ public class GameClient extends Client {
                 System.out.printf("[%d] %s left the game.\n", player.getId(), player.getName());
             } break;
             }
-        } catch (IllegalArgumentException ex) {
-            ex.printStackTrace();
-        } catch (DeserializationException ex) {
+        } catch (IllegalArgumentException | DeserializationException ex) {
             ex.printStackTrace();
         }
     }

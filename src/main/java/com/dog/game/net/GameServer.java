@@ -80,9 +80,7 @@ public class GameServer extends Server {
                 } break;
                 }
             }
-        } catch (DeserializationException ex) {
-            ex.printStackTrace(); // TODO: handle malformed message
-        } catch (IllegalArgumentException ex) {
+        } catch (DeserializationException | IllegalArgumentException ex) {
             ex.printStackTrace(); // TODO: handle malformed message
         }
     }
