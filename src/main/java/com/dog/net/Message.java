@@ -2,16 +2,6 @@ package com.dog.net;
 
 import java.util.Arrays;
 
-class DeserializationException extends Exception {
-    public DeserializationException() {
-
-    }
-
-    public DeserializationException(String what) {
-        super(what);
-    }
-}
-
 public class Message {
     private String mType;
     private byte[] mData;
@@ -39,6 +29,7 @@ public class Message {
     }
 
     public String type() { return mType; }
+    
     public byte[] data() { return mData; }
 
     // --------------------------
@@ -54,8 +45,8 @@ public class Message {
         }
     }
 
-    public Message writeString(String data) {
-        writeInt(data.length());
+    public Message withString(String data) {
+        withInt(data.length());
 
         var result = new byte[data.length() * 2];
         for (int i = 0; i < result.length; i += 2) {
@@ -67,7 +58,7 @@ public class Message {
         return this;
     }
 
-    public Message writeInt(int data) {
+    public Message withInt(int data) {
         var result = new byte[4];
         result[0] = (byte)(data & 0xFF);
         result[1] = (byte)((data >> 8) & 0xFF);

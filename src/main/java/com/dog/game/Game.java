@@ -3,18 +3,23 @@ package com.dog.game;
 import java.util.Arrays;
 
 import com.dog.game.net.Player;
+import com.dog.net.Server;
 
 public class Game {
     private static final int STARTING_CARDS = 7;
+    public static final int MIN_PLAYERS = 2;
+    public static final int MAX_PLAYERS = 8;
 
-    private Deck     mDeck      = new Deck();
-    private Deck     mDiscard   = new Deck();
-    private int      mTurn      = 0;
-    private int      mPlayOrder = +1; // +1 for clockwise, -1 for counterclockwise
-    private Player[] mPlayers;
+    private final Player[] mPlayers;
+    private final Server   mServer;
+    private Deck           mDeck      = new Deck();
+    private Deck           mDiscard   = new Deck();
+    private int            mTurn      = 0;
+    private int            mPlayOrder = +1; // +1 for clockwise, -1 for counterclockwise
 
-    public Game(Player[] players) {
+    public Game(Server server, Player[] players) {
         mPlayers = players;
+        mServer  = server;
 
         for (var suit : Suit.values())
             for (var face : Face.values())
@@ -48,7 +53,6 @@ public class Game {
         return turn;
     }
 
-
     public void play(Player player, int cardIndex) throws IllegalArgumentException {
         int index = Arrays.asList(mPlayers).indexOf(player);
         if (index == -1 || cardIndex >= player.getCards().size())
@@ -78,13 +82,18 @@ public class Game {
             mTurn = nextPlayer();
         }
 
-
-
-
         // TODO: other rules i cant remember the specifics of right now:
         //       there's a face that reverses the order of play
         //       there's a face that gives someone a card
 
         mTurn = nextPlayer();
+    }
+
+    public Player[] getPlayers() {
+        return mPlayers;
+    }
+
+    public Card getPileTop() {
+        return mDiscard.top();
     }
 }

@@ -79,7 +79,7 @@ public abstract class Server implements Runnable, ConnectionHandler {
             conn.send(message);
     }
 
-    public void sendAllBut(Connection exclude, Message message) {
+    public void sendAllExcept(Connection exclude, Message message) {
         for (var conn : mConns)
             if (conn != exclude)
                 conn.send(message);

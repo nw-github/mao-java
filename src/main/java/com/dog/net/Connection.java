@@ -71,7 +71,10 @@ public class Connection implements Runnable {
         return mSocket != null && !mSocket.isClosed();
     }
 
-    public Socket getSocket() {
-        return mSocket;
+    @Override
+    public String toString() {
+        return String.format("%s:%d",
+            mSocket.getInetAddress().toString(),
+            mSocket.getPort());
     }
 }
