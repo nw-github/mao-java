@@ -2,9 +2,11 @@ package com.dog.game.net;
 
 import java.util.*;
 
+import com.dog.game.Card;
 import com.dog.game.Game;
 import com.dog.game.GameException;
 import com.dog.net.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class GameServer extends Server {
     private final static int MAX_TEXT = 200;
@@ -33,13 +35,15 @@ public class GameServer extends Server {
     @Override
     public void onRecvMessage(Connection source, Message message) {
         try {
+            var reader = new MessageReader(message);
+
             synchronized (gameLock) {
                 switch (ClientMessage.valueOf(message.type())) {
                 case REGISTER: {
                     if (players.containsKey(source))
                         return;
 
-                    var player = new Player(source, nextId(), filterUserText(message.readString()));
+                    var player = new Player(source, nextId(), filterUserText(reader.readString()));
                     if (!game.addPlayer(player)) {
                         System.out.printf("Registration from %s rejected: cannot join.\n", source.toString());
 
@@ -48,9 +52,12 @@ public class GameServer extends Server {
                     }
                     players.put(source, player);
 
-                    send(source, ClientGame.fromGame(ServerMessage.ACCEPTED, game, player));
-                    sendAll(new Message(ServerMessage.PLAYER_JOIN)
-                        .withString(player.toString()));
+                    send(source, new MessageBuilder(ServerMessage.ACCEPTED)
+                        .withJson(new ClientGame(game, player))
+                        .build());
+                    sendAll(new MessageBuilder(ServerMessage.PLAYER_JOIN)
+                        .withJson(new ClientPlayer(player))
+                        .build());
 
                     if (players.size() == 1) // TODO: temporary
                         player.setIsDealer(true);
@@ -58,23 +65,25 @@ public class GameServer extends Server {
                         game.start();
                 } break;
                 case PLAY: {
-                    var index = message.readInt();
-                    var text  = filterUserText(message.readString());
+                    var card = reader.readJson(Card.class);
+                    var text = filterUserText(reader.readString());
                     if (text.length() > MAX_TEXT)
                         text = text.substring(MAX_TEXT);
 
-                    game.play(players.get(source), index, text);
+                    game.play(players.get(source), card, text);
                 } break;
                 case PUNISH: {
                     var player = players.get(source);
                     if (player == null || !game.isGameStarted() || !player.isDealer())
                         return;
 
-                    game.punish(getPlayerById(message.readInt()), message.readString());
+                    game.punish(getPlayerById(reader.readInt()), reader.readString());
                 } break;
                 }
             }
-        } catch (DeserializationException | IllegalArgumentException | GameException ex) {
+        } catch (IllegalArgumentException | GameException ex) {
+            ex.printStackTrace(); // TODO 
+        } catch (DeserializationException | JsonProcessingException ex) {
             ex.printStackTrace(); // TODO 
         }
     }
@@ -86,8 +95,9 @@ public class GameServer extends Server {
         synchronized (gameLock) {
             var player = players.get(conn);
             if (game.removePlayer(player)) {
-                sendAllExcept(conn, new Message(ServerMessage.PLAYER_LEAVE)
-                    .withInt(player.getId()));
+                sendAllExcept(conn, new MessageBuilder(ServerMessage.PLAYER_LEAVE)
+                    .withInt(player.getId())
+                    .build());
 
                 players.remove(conn);
             }

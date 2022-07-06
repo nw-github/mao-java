@@ -48,7 +48,7 @@ public class Main {
             @Override
             public void onGameStart(ClientGame game) {
                 System.out.printf("\n[Game Start] (%s) (%d cards drawable)\n\t",
-                    game.getTopCard().toString(),
+                    game.getDiscardTop().toString(),
                     game.getDrawDeck());
                 
                 for (var item : game.getPlayers().entrySet())
@@ -57,8 +57,8 @@ public class Main {
                 
                 printDeck();
 
-                if (game.getMyId() == 1)
-                    mClient.play(0, "");
+                if (game.getLocalId() == 1)
+                    mClient.play(game.getCards().get(0), "");
             }
 
             @Override
@@ -70,20 +70,20 @@ public class Main {
 
             @Override
             public void onPlay(ClientPlayer player, String text, Card played) {
-                if (!mClient.getGameState().isMyPlayer(player)) {
+                if (!mClient.getGame().isLocalPlayer(player)) {
                     System.out.printf("%s played '%s' onto '%s' (now has %d cards)\n",
                         player.getName(),
                         played.toString(),
-                        mClient.getGameState().getTopCard().toString(),
+                        mClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
 
-                    mClient.play(0, "");
+                    mClient.play(mClient.getGame().getCards().get(0), "");
                 } else {
                     System.out.printf("Played '%s' onto '%s' (now has %d cards)\n",
                         played.toString(),
-                        mClient.getGameState().getTopCard().toString(),
+                        mClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
@@ -103,7 +103,7 @@ public class Main {
 
                 System.out.printf("\t\tDeck now has %d cards%s\n", 
                     newSize,
-                    newSize >= mClient.getGameState().getDrawDeck() ? " (was reshuffled)" : "");
+                    newSize >= mClient.getGame().getDrawDeck() ? " (was reshuffled)" : "");
             }
 
             @Override
@@ -113,7 +113,7 @@ public class Main {
 
             private void printDeck() {
                 System.out.printf("My cards: \n\t");
-                for (var card : mClient.getGameState().getCards())
+                for (var card : mClient.getGame().getCards())
                     System.out.printf("%s, ", card.toString());
                 System.out.printf("\n\n");
             }
@@ -124,9 +124,9 @@ public class Main {
 
     public static void main(String[] args) {
         if (args.length > 0) {
-            runServer(5000);
-        } else {
             runClient("127.0.0.1", 5000);
+        } else {
+            runServer(5000);
         }
     }
 }

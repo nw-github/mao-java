@@ -4,7 +4,7 @@ import java.util.*;
 
 import com.dog.Utils;
 import com.dog.game.net.*;
-import com.dog.net.Message;
+import com.dog.net.MessageBuilder;
 import com.dog.net.Server;
 
 public class Game {
@@ -43,7 +43,9 @@ public class Game {
                 player.getCards().take(deck);
 
         for (var player : players)
-            server.send(player.getConnection(), ClientGame.fromGame(ServerMessage.GAME_START, this, player));
+            server.send(player.getConnection(), new MessageBuilder(ServerMessage.GAME_START)
+                .withJson(new ClientGame(this, player))
+                .build());
             
         return hasStarted = true;
     }
@@ -88,35 +90,34 @@ public class Game {
     /**
      * Play or draw a card for a specific player.
      * @param player Target player
-     * @param cardIndex Index into the players cards to play. 
-     *  A negative index is treated as drawing a card.
-     * @param userText  The user's input text
-     * @throws IllegalArgumentException Thrown if the card index >= the player's deck size or the player is invalid
+     * @param card The card to play, pass 'null' to draw a card
+     * @param userText The user's input text
+     * @throws IllegalArgumentException Thrown if the card is not in the player's deck or the player is invalid
      * @throws GameException Thrown if the game hasn't started
      */
-    public void play(Player player, int cardIndex, String userText) throws IllegalArgumentException, GameException {
+    public void play(Player player, Card card, String userText) throws IllegalArgumentException, GameException {
         if (!isGameStarted())
             throw new GameException("Cannot play before the game has started.");
         
         int index = players.indexOf(player);
-        if (index == -1 || cardIndex >= player.getCards().size())
-            throw new IllegalArgumentException("Player or card index is invalid.");
+        if (index == -1 || (card != null && !player.getCards().contains(card)))
+            throw new IllegalArgumentException("Player or card is invalid.");
 
         boolean validTurn = index == currentTurn;
-        if (cardIndex >= 0) {
-            var valid = isValidMove(player.getCards().get(cardIndex));
-            var card  = discard(player.getCards(), cardIndex);
+        if (card != null) {
+            var valid = isValidMove(card);
+            discard(player.getCards(), player.getCards().indexOf(card));
 
-            server.sendAll(new Message(ServerMessage.PLAY)
+            server.sendAll(new MessageBuilder(ServerMessage.PLAY)
                 .withInt(player.getId())
                 .withString(userText)
-                .withString(card.toNetString()));
+                .withJson(card)
+                .build());
 
             if (!valid)
                 punish(player, "Invalid move.");  // TODO: i dont remember what the reason given for an invalid move usually is            
 
             checkText(player, card, userText);
-
             switch (card.face()) {
             case JACK:
                 playOrder = playOrder == +1 ? -1 : +1;
@@ -179,16 +180,18 @@ public class Game {
                 discard.add(top);
             }
 
-            server.sendAllExcept(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+            server.sendAllExcept(player.getConnection(), new MessageBuilder(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
-                .withString("")
+                .withJson(null)
                 .withString(reason)
-                .withInt(deck.size()));
-            server.send(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+                .withInt(deck.size())
+                .build());
+            server.send(player.getConnection(), new MessageBuilder(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
-                .withString(card.toNetString())
+                .withJson(card)
                 .withString(reason)
-                .withInt(deck.size()));
+                .withInt(deck.size())
+                .build());
         }
     }
 
@@ -299,17 +302,15 @@ public class Game {
         return userText.equals(target.toLowerCase());
     }
 
-    private Card discard(Deck deck, int index) {
-        var card = deck.get(index);
+    private void discard(Deck deck, int index) {
+        currentSuit = deck.get(index).suit();
         discard.take(deck, index);
-
-        currentSuit = card.suit();
-        return card;
     }
 
     private void endGame(Player winner) {
-        server.sendAll(new Message(ServerMessage.GAME_END)
-            .withInt(winner.getId()));
+        server.sendAll(new MessageBuilder(ServerMessage.GAME_END)
+            .withInt(winner.getId())
+            .build());
 
         hasStarted = false;
         server.stop(); // TODO: reset server/go back to lobby

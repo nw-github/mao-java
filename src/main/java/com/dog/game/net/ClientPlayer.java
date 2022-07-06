@@ -1,23 +1,19 @@
 package com.dog.game.net;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public class ClientPlayer {
     private final int id;
     private final String name;
     private int cards;
 
-    // see Player::toString()
-    public ClientPlayer(String playerString) throws IllegalArgumentException {
-        var parts = playerString.split(":");
-        if (parts.length != 3)
-            throw new IllegalArgumentException("The source string was not correctly formatted.");
+    @JsonCreator
+    private ClientPlayer() { id = 0; name = null; cards = 0; }
 
-        try {
-            id    = Integer.parseInt(parts[0]);
-            name  = parts[1];
-            cards = Integer.parseInt(parts[2]);
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException("The numbers could not be parsed.");
-        }
+    public ClientPlayer(Player player) {
+        this.id    = player.getId();
+        this.name  = player.getName();
+        this.cards = player.getCards().size();
     }
 
     public String getName() {

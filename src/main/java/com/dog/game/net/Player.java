@@ -4,11 +4,11 @@ import com.dog.game.Deck;
 import com.dog.net.Connection;
 
 public class Player {
-    private final Deck         cards    = new Deck();
-    private final Connection   conn;
-    private final String       name;
-    private final int          id;
-    private boolean            isDealer = false;
+    private final Deck       cards    = new Deck();
+    private final Connection conn;
+    private final String     name;
+    private final int        id;
+    private boolean          isDealer = false;
 
     public Player(Connection conn, int id, String name) {
         this.conn = conn;
@@ -38,10 +38,5 @@ public class Player {
 
     public void setIsDealer(boolean isDealer) {
         this.isDealer = isDealer;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("%d:%s:%d", getId(), getName(), getCards().size());
     }
 }

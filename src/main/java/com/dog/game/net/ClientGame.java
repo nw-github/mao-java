@@ -3,60 +3,44 @@ package com.dog.game.net;
 import java.util.*;
 
 import com.dog.game.*;
-import com.dog.net.DeserializationException;
-import com.dog.net.Message;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
 public class ClientGame {
-    private final Map<Integer, ClientPlayer> players = new LinkedHashMap<>();
-    private final Deck cards = new Deck();
-    private final int id;
-    private Card top;
+    private final Map<Integer, ClientPlayer> players;
+    private final Deck cards;
+    private final int localId;
+    private Card discardTop;
     private int drawDeck;
 
-    public ClientGame(Message message) throws DeserializationException, IllegalArgumentException {
-        this.id       = message.readInt();
-        var players   = message.readString();
-        var cards     = message.readString();
-        var top       = message.readString();
-        this.top      = top.isEmpty() ? null : Card.fromNetString(top);
-        this.drawDeck = message.readInt();
+    @JsonCreator
+    private ClientGame() { players = null; cards = null; localId = 0; }
 
-        for (var player : players.split(";")) {
-            if (player.isEmpty())
-                continue;
-
-            addPlayer(player);
-        }
-
-        var player = getPlayer(id);
-        player.setCards(0);
-        for (var card : cards.split(";")) {
-            if (card.isEmpty())
-                continue;
-
-            addCard(player, card);
-        }
+    public ClientGame(Game game, Player player) {
+        this.localId   = player.getId();
+        this.cards     = player.getCards();
+        this.discardTop = game.getDiscardTop();
+        this.drawDeck   = game.getDrawDeckSize();
+        this.players    = new HashMap<Integer, ClientPlayer>();
+        for (var pl : game.getPlayers())
+            this.players.put(pl.getId(), new ClientPlayer(pl));
     }
 
-    public Card addCard(ClientPlayer player, String source) throws IllegalArgumentException {
+    public void addCard(ClientPlayer player, Card card) throws IllegalArgumentException {
         player.addCard();
-        if (isMyPlayer(player)) {
-            var card = Card.fromNetString(source);
+        if (isLocalPlayer(player)) {
+            if (card == null)
+                throw new IllegalArgumentException("Card cannot be null if adding to the local player.");
             cards.add(0, card);
-            return card;
         }
-
-        return null;
     }
 
-    public void removeCard(ClientPlayer player, String source) throws IllegalArgumentException {
+    public void removeCard(ClientPlayer player, Card card) throws IllegalArgumentException {
         player.removeCard();
-        if (isMyPlayer(player))
-            cards.remove(Card.fromNetString(source));
+        if (isLocalPlayer(player))
+            cards.remove(card);
     }
 
-    public ClientPlayer addPlayer(String source) throws IllegalArgumentException {
-        var player = new ClientPlayer(source);
+    public ClientPlayer addPlayer(ClientPlayer player) throws IllegalArgumentException {
         players.put(player.getId(), player);
         return player;
     }
@@ -75,6 +59,10 @@ public class ClientGame {
         return players.get(id);
     }
     
+    public boolean isLocalPlayer(ClientPlayer player) {
+        return player.getId() == localId;
+    }
+
     public int getDrawDeck() {
         return drawDeck;
     }
@@ -91,41 +79,15 @@ public class ClientGame {
         return cards;
     }
 
-    public Card getTopCard() {
-        return top;
+    public Card getDiscardTop() {
+        return discardTop;
     }
 
-    public void setTopCard(Card card) {
-        top = card;
+    public void setDiscardTop(Card card) {
+        discardTop = card;
     }
 
-    public boolean isMyPlayer(ClientPlayer player) {
-        return player.getId() == id;
-    }
-
-    public int getMyId() {
-        return id;
-    }
-
-    public static Message fromGame(Object type, Game game, Player player) {
-        var cardsBuilder = new StringBuilder();
-        for (var card : player.getCards()) {
-            cardsBuilder.append(card.toNetString());
-            cardsBuilder.append(';');
-        }
-
-        var playersBuilder = new StringBuilder();
-        for (var pl : game.getPlayers()) {
-            playersBuilder.append(pl.toString());
-            playersBuilder.append(';');
-        }
-
-        var top = game.getDiscardTop();
-        return new Message(type)
-            .withInt(player.getId())
-            .withString(playersBuilder.toString())
-            .withString(cardsBuilder.toString())
-            .withString(top != null ? top.toNetString() : "")
-            .withInt(game.getDrawDeckSize());
+    public int getLocalId() {
+        return localId;
     }
 }
