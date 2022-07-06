@@ -1,3 +1,8 @@
+# ide files
+.vscode
+.idea
+mao.iml
+
+# build files
 target
 tmp
-.vscode

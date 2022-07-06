@@ -1,14 +1,19 @@
 package com.dog.game.net;
 
+import com.dog.game.Card;
 import com.dog.net.*;
 
 public class GameClient extends Client {
+    private final ClientHandler mHandler;
     private final String mName;
     private ClientGame mGame;
+    private boolean mGameStarted = false;
 
-    public GameClient(String name, String host, int port, int maxAttempts, int timeout) {
+    public GameClient(String name, String host, int port, int maxAttempts, int timeout, ClientHandler handler) {
         super(host, port, maxAttempts, timeout);
         
+        mHandler = handler;
+        mHandler.create(this);
         mName = name;
     }
 
@@ -23,49 +28,77 @@ public class GameClient extends Client {
             switch (ServerMessage.valueOf(message.type())) {
             case ACCEPTED: {
                 mGame = new ClientGame(message);
-
-                if (mGame.getPlayers().size() != 0) {
-                    System.out.printf("[%d] Current players: \n", mGame.getId());
-                    for (var item : mGame.getPlayers().entrySet())
-                        System.out.printf("\t [%d] %s\n", item.getKey(), item.getValue().getName());
-                }
+                mHandler.onAccept(mGame);
             } break;
             case GAME_START: {
                 mGame = new ClientGame(message);
-
-                System.out.printf("First card: %s of %s\n", mGame.getTopCard().face().toString(), mGame.getTopCard().suit().toString());
-                for (var item : mGame.getPlayers().entrySet())
-                    System.out.printf("\t[%d] %s : %d cards\n", item.getKey(), item.getValue().getName(), item.getValue().getCards());
-                System.out.printf("[%d] My cards: \n", mGame.getId());
-
-                for (var card : mGame.getCards())
-                    System.out.printf("\t%s of %s\n", card.face().toString(), card.suit().toString());
+                mGameStarted = true;
+                mHandler.onGameStart(mGame);
+            } break;
+            case GAME_END: {
+                mGameStarted = false;
+                mHandler.onGameEnd(mGame.getPlayer(message.readInt()));
             } break;
             case PLAYER_JOIN: {
-                var string = message.readString();
-                var player = mGame.addPlayer(string);
-                if (player == null) {
-                    System.out.printf("Failed parsing player from source string '%s'\n", string);
-                    return;
-                }
-
-                System.out.printf("[%d] %s joined the game.\n", player.getId(), player.getName());
+                mHandler.onPlayerJoin(mGame.addPlayer(message.readString()));
             } break;
             case PLAYER_LEAVE: {
                 var player = mGame.removePlayer(message.readInt());
-                if (player == null)
-                    return;
+                mGame.setDrawDeck(mGame.getDrawDeck() + player.getCards());
+                mHandler.onPlayerLeave(player);
+            } break;
+            case PLAY: {
+                var player  = mGame.getPlayer(message.readInt());
+                var text    = message.readString();
+                var card    = message.readString();
 
-                System.out.printf("[%d] %s left the game.\n", player.getId(), player.getName());
+                mGame.removeCard(player, card);
+
+                var played = Card.fromString(card);
+                mHandler.onPlay(player, text, played);
+                mGame.setTopCard(played);
+            } break;
+            case RECV_CARD: {
+                var player  = mGame.getPlayer(message.readInt());
+                var card    = message.readString();
+                var reason  = message.readString();
+                var newSize = message.readInt();
+
+                mHandler.onCardReceived(player, mGame.addCard(player, card), reason, newSize);
+                mGame.setDrawDeck(newSize);
             } break;
             }
         } catch (IllegalArgumentException | DeserializationException ex) {
-            ex.printStackTrace();
+            ex.printStackTrace(); // TODO
+            
+            stop();
         }
     }
 
     @Override
     public void onDisconnect() {
+        mHandler.onDisconnect();
+    }
 
+    public ClientGame getGameState() {
+        return mGame;
+    }
+
+    public void play(int index, String text) {
+        if (!mGameStarted)
+            return;
+
+        send(new Message(ClientMessage.PLAY)
+            .withInt(index)
+            .withString(text));
+    }
+
+    public void draw() {
+        if (!mGameStarted)
+            return;
+
+        send(new Message(ClientMessage.PLAY)
+            .withInt(-1)
+            .withString(""));
     }
 }

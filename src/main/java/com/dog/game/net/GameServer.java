@@ -3,85 +3,79 @@ package com.dog.game.net;
 import java.util.*;
 
 import com.dog.game.Game;
+import com.dog.game.GameException;
 import com.dog.net.*;
 
 public class GameServer extends Server {
-    private final int mMaxPlayers;
+    private final static int MAX_TEXT = 200;
 
-    private Map<Connection, Player> mPlayers = new LinkedHashMap<>();
-    private Game mGame;
+    private final Map<Connection, Player> mPlayers = new LinkedHashMap<>();
+    private final Game mGame;
+    private final Object mGameLock = new Object();
     private int mNextId = 1;
 
     public GameServer(int port, int maxPlayers) {
         super(port);
 
-        if (maxPlayers > Game.MAX_PLAYERS)
-            maxPlayers = Game.MAX_PLAYERS;
-
-        mMaxPlayers = maxPlayers;
+        mGame = new Game(this, maxPlayers);
     }
 
     @Override
     public boolean onConnect(Connection conn) {
-        System.out.printf("New connection from %s: %s\n", conn.toString(),
-            canPlayerJoin() ? "Accepted!" : "Rejected!");
+        synchronized (mGameLock) {
+            System.out.printf("New connection from %s: %s\n", conn.toString(),
+                mGame.canAddPlayer() ? "Accepted!" : "Rejected!");
 
-        return canPlayerJoin();
+            return mGame.canAddPlayer();
+        }
     }
 
     @Override
-    public synchronized void onRecvMessage(Connection source, Message message) {
+    public void onRecvMessage(Connection source, Message message) {
         try {
-            synchronized (mPlayers) {
+            synchronized (mGameLock) {
                 switch (ClientMessage.valueOf(message.type())) {
                 case REGISTER: {
                     if (mPlayers.containsKey(source))
                         return;
 
-                    if (!canPlayerJoin()) {
+                    var player = new Player(source, nextId(), filterUserText(message.readString()));
+                    if (!mGame.addPlayer(player)) {
                         System.out.printf("Registration from %s rejected: cannot join.\n", source.toString());
 
                         source.disconnect();
                         return;
-                    }                    
+                    }
+                    mPlayers.put(source, player);
 
-                    var player = new Player(source, nextId(), filterPlayerName(message.readString()));
-                    send(source, ClientGame.fromGame(ServerMessage.ACCEPTED, null, mPlayers.values(), player));
+                    send(source, ClientGame.fromGame(ServerMessage.ACCEPTED, null, mPlayers.values(), 0, player));
                     sendAll(new Message(ServerMessage.PLAYER_JOIN)
                         .withString(player.toString()));
 
-                    mPlayers.put(source, player);
                     if (mPlayers.size() == 1) // TODO: temporary
                         player.setDealer(true);
-                    if (mPlayers.size() == mMaxPlayers)
-                        startGame();
+                    if (mPlayers.size() == mGame.getMaxPlayers())
+                        mGame.start();
                 } break;
                 case PLAY: {
-                    var player = mPlayers.get(source);
-                    if (player == null || !isGameStarted())
-                        return;
+                    var index = message.readInt();
+                    var text  = filterUserText(message.readString());
+                    if (text.length() > MAX_TEXT)
+                        text = text.substring(MAX_TEXT);
 
-                    synchronized (mGame) {
-                        mGame.play(player, message.readInt());
-                    }
+                    mGame.play(mPlayers.get(source), index, text);
                 } break;
                 case PUNISH: {
                     var player = mPlayers.get(source);
-                    if (player == null || !isGameStarted() || !player.isDealer())
+                    if (player == null || !mGame.isGameStarted() || !player.isDealer())
                         return;
 
-                    var target = getPlayerById(message.readInt());
-                    if (target == null)
-                        return;
-
-                    synchronized (mGame) {
-                        mGame.punish(player, message.readString());
-                    }
+                    mGame.punish(getPlayerById(message.readInt()), message.readString());
                 } break;
                 }
             }
-        } catch (DeserializationException | IllegalArgumentException ex) {
-            ex.printStackTrace(); // TODO: handle malformed message
+        } catch (DeserializationException | IllegalArgumentException | GameException ex) {
+            ex.printStackTrace(); // TODO 
         }
     }
 
@@ -89,51 +83,24 @@ public class GameServer extends Server {
     public void onDisconnect(Connection conn) {
         System.out.printf("Connection from %s disconnected\n", conn.toString());
 
-        // TODO: stop/readjust the game
-        synchronized (mPlayers) {
+        synchronized (mGameLock) {
             var player = mPlayers.get(conn);
-            if (player != null) {
+            if (mGame.removePlayer(player)) {
                 sendAllExcept(conn, new Message(ServerMessage.PLAYER_LEAVE)
                     .withInt(player.getId()));
+
                 mPlayers.remove(conn);
             }
         }
     }
-    
-    public boolean startGame() {
-        if (isGameStarted())
-            return false;
-
-        synchronized (mPlayers) {
-            if (mPlayers.size() < Game.MIN_PLAYERS)
-                return false;
-
-            synchronized (mGame = new Game(this, mPlayers.values().toArray(new Player[mPlayers.size()]))) {
-                for (var player : mGame.getPlayers())
-                    send(player.getConnection(), ClientGame.fromGame(ServerMessage.GAME_START, mGame, player));
-                
-                return true;
-            }
-        }
-    }
-
-    public boolean isGameStarted() {
-        return mGame != null;
-    }
    
-    public static String filterPlayerName(String name) {
+    private static String filterUserText(String name) {
         return name.replaceAll("[^a-zA-Z\\d]", "");
     }
 
-    private boolean canPlayerJoin() {
-        synchronized (mPlayers) {
-            return mPlayers.size() < mMaxPlayers && !isGameStarted();
-        }
-    }
-
     private Player getPlayerById(int id) {
-        synchronized (mPlayers) {
-            for (var player : mPlayers.values())
+        synchronized (mGameLock) {
+            for (var player : mGame.getPlayers())
                 if (player.getId() == id)
                     return player;
 
