@@ -5,10 +5,19 @@ public class ClientPlayer {
     private final String mName;
     private int mCards;
 
-    public ClientPlayer(int id, String name, int cards) {
-        mId    = id;
-        mName  = name;
-        mCards = cards;
+    // see Player::toString()
+    public ClientPlayer(String playerString) throws IllegalArgumentException {
+        var parts = playerString.split(":");
+        if (parts.length != 3)
+            throw new IllegalArgumentException("The source string was not correctly formatted.");
+
+        try {
+            mId    = Integer.parseInt(parts[0]);
+            mName  = parts[1];
+            mCards = Integer.parseInt(parts[2]);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("The numbers could not be parsed.");
+        }
     }
 
     public String getName() {

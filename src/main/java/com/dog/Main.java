@@ -47,9 +47,8 @@ public class Main {
 
             @Override
             public void onGameStart(ClientGame game) {
-                System.out.printf("\n[Game Start] (%s of %s) (%d cards drawable)\n\t",
-                    game.getTopCard().face().toString(),
-                    game.getTopCard().suit().toString(),
+                System.out.printf("\n[Game Start] (%s) (%d cards drawable)\n\t",
+                    game.getTopCard().toString(),
                     game.getDrawDeck());
                 
                 for (var item : game.getPlayers().entrySet())
@@ -65,28 +64,26 @@ public class Main {
             @Override
             public void onGameEnd(ClientPlayer winner) {
                 System.out.printf("Game over: %s wins!\n", winner.getName());
+
+                mClient.stop();
             }
 
             @Override
             public void onPlay(ClientPlayer player, String text, Card played) {
                 if (!mClient.getGameState().isMyPlayer(player)) {
-                    System.out.printf("%s played '%s of %s' onto '%s of %s' (now has %d cards)\n",
+                    System.out.printf("%s played '%s' onto '%s' (now has %d cards)\n",
                         player.getName(),
-                        played.face().toString(),
-                        played.suit().toString(),
-                        mClient.getGameState().getTopCard().face().toString(),
-                        mClient.getGameState().getTopCard().suit().toString(),
+                        played.toString(),
+                        mClient.getGameState().getTopCard().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
 
                     mClient.play(0, "");
                 } else {
-                    System.out.printf("Played '%s of %s' onto '%s of %s' (now has %d cards)\n",
-                        played.face().toString(),
-                        played.suit().toString(),
-                        mClient.getGameState().getTopCard().face().toString(),
-                        mClient.getGameState().getTopCard().suit().toString(),
+                    System.out.printf("Played '%s' onto '%s' (now has %d cards)\n",
+                        played.toString(),
+                        mClient.getGameState().getTopCard().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
@@ -96,13 +93,9 @@ public class Main {
             @Override
             public void onCardReceived(ClientPlayer player, Card card, String reason, int newSize) {
                 if (card != null) {
-                    System.out.printf("\t> Received '%s of %s' (now has %d cards)\n",
-                        card.face().toString(),
-                        card.suit().toString(),
-                        player.getCards());
+                    System.out.printf("\t> Received '%s' (now has %d cards)\n", card.toString(), player.getCards());
                 } else {
-                    System.out.printf("\t- Received a card (now has %d cards)\n",
-                        player.getCards());
+                    System.out.printf("\t- Received a card (now has %d cards)\n", player.getCards());
                 }
                 
                 if (!reason.isEmpty())
@@ -121,7 +114,7 @@ public class Main {
             private void printDeck() {
                 System.out.printf("My cards: \n\t");
                 for (var card : mClient.getGameState().getCards())
-                    System.out.printf("%s of %s, ", card.face().toString(), card.suit().toString());
+                    System.out.printf("%s, ", card.toString());
                 System.out.printf("\n\n");
             }
         });

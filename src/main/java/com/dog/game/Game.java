@@ -110,7 +110,7 @@ public class Game {
             mServer.sendAll(new Message(ServerMessage.PLAY)
                 .withInt(player.getId())
                 .withString(userText)
-                .withString(card.toString()));
+                .withString(card.toNetString()));
 
             if (!valid)
                 punish(player, "Invalid move.");  // TODO: i dont remember what the reason given for an invalid move usually is            
@@ -148,8 +148,10 @@ public class Game {
         return mPlayers;
     }
 
-    public Card getPileTop() {
-        return mDiscard.top();
+    public Card getDiscardTop() {
+        if (mDiscard.size() != 0)
+            return mDiscard.top();
+        return null;
     }
 
     public int getDrawDeckSize() {
@@ -184,7 +186,7 @@ public class Game {
                 .withInt(mDeck.size()));
             mServer.send(player.getConnection(), new Message(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
-                .withString(card.toString())
+                .withString(card.toNetString())
                 .withString(reason)
                 .withInt(mDeck.size()));
         }
@@ -212,28 +214,29 @@ public class Game {
         var phrases = new ArrayList<String>();
         switch (card.face()) {
         case JACK:
-            phrases.add("here comes the badger" + spades);
+            phrases.add("Here comes the badger" + spades);
             break;
         case QUEEN:
-            phrases.add("all hail the queen" + spades);
+            phrases.add("All hail the queen" + spades);
             break;
         case KING:
-            phrases.add("all hail the king" + spades);
+            phrases.add("All hail the king" + spades);
             break;
         default:
             if (card.suit() == Suit.SPADES)
-                phrases.add(String.format("%s of spades", card.face().toString()));
+                phrases.add(card.toString());
             
             if (card.face() == Face.SEVEN)
-                phrases.add("have a nice day");
+                phrases.add("Have a nice day");
+
             break;
         }
 
         if (player.getCards().size() == 1)
-            phrases.add("mao");
+            phrases.add("Mao");
 
         if (player.getCards().size() == 0)
-            phrases.add("all hail the king of mao");
+            phrases.add("All hail the king of Mao");
 
         var parts = Arrays.asList(userText.split("\n"));
         var it    = parts.iterator();
@@ -269,9 +272,31 @@ public class Game {
         return false;
     }
 
-    private boolean compare(String userText, String target) {
-        // TODO: compare less rigidly to allow typos/punctuation
-        return userText.toLowerCase().strip().equals(target.toLowerCase());
+    private static boolean compare(String userText, String target) {
+        var replacements = new String[][] {
+            {"1", "ace"},
+            {"a", "ace"},
+            {"2", "two"},
+            {"3", "three"},
+            {"4", "four"},
+            {"5", "five"},
+            {"6", "six"},
+            {"7", "seven"},
+            {"8", "eight"},
+            {"9", "nine"},
+            {"j", "jack"},
+            {"q", "queen"},
+            {"k", "king"},
+        };
+
+        userText = userText.toLowerCase().strip();
+        for (var pair : replacements)
+            userText.replace(pair[0], pair[1]);
+
+        if (Utils.endsWithAny(userText, ".", "!", "?"))
+            userText = userText.substring(0, userText.length() - 1);
+
+        return userText.equals(target.toLowerCase());
     }
 
     private Card discard(Deck deck, int index) {
@@ -287,6 +312,6 @@ public class Game {
             .withInt(winner.getId()));
 
         mHasStarted = false;
-        // TODO: reset server/go back to lobby
+        mServer.stop(); // TODO: reset server/go back to lobby
     }
 }

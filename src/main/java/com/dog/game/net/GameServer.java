@@ -48,7 +48,7 @@ public class GameServer extends Server {
                     }
                     mPlayers.put(source, player);
 
-                    send(source, ClientGame.fromGame(ServerMessage.ACCEPTED, null, mPlayers.values(), 0, player));
+                    send(source, ClientGame.fromGame(ServerMessage.ACCEPTED, mGame, player));
                     sendAll(new Message(ServerMessage.PLAYER_JOIN)
                         .withString(player.toString()));
 

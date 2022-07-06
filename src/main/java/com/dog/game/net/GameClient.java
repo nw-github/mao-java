@@ -54,7 +54,7 @@ public class GameClient extends Client {
 
                 mGame.removeCard(player, card);
 
-                var played = Card.fromString(card);
+                var played = Card.fromNetString(card);
                 mHandler.onPlay(player, text, played);
                 mGame.setTopCard(played);
             } break;

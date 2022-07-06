@@ -13,20 +13,19 @@ public class ClientGame {
     private Card mTop;
     private int mDrawDeck;
 
-    public ClientGame(Message message) throws DeserializationException {
+    public ClientGame(Message message) throws DeserializationException, IllegalArgumentException {
         mId         = message.readInt();
         var players = message.readString();
         var cards   = message.readString();
         var top     = message.readString();
-        mTop        = top.isEmpty() ? null : Card.fromString(top);
+        mTop        = top.isEmpty() ? null : Card.fromNetString(top);
         mDrawDeck   = message.readInt();
 
         for (var player : players.split(";")) {
             if (player.isEmpty())
                 continue;
 
-            if (addPlayer(player) == null)
-                System.out.printf("Failed parsing player string '%s'\n", player);
+            addPlayer(player);
         }
 
         var player = getPlayer(mId);
@@ -34,16 +33,15 @@ public class ClientGame {
         for (var card : cards.split(";")) {
             if (card.isEmpty())
                 continue;
-            
-            if (addCard(player, card) == null)
-                System.out.printf("Failed parsing card string '%s'\n", card);
+
+            addCard(player, card);
         }
     }
 
     public Card addCard(ClientPlayer player, String source) throws IllegalArgumentException {
         player.addCard();
         if (isMyPlayer(player)) {
-            var card = Card.fromString(source);
+            var card = Card.fromNetString(source);
             mCards.add(0, card);
             return card;
         }
@@ -54,33 +52,25 @@ public class ClientGame {
     public void removeCard(ClientPlayer player, String source) throws IllegalArgumentException {
         player.removeCard();
         if (isMyPlayer(player))
-            mCards.remove(Card.fromString(source));
+            mCards.remove(Card.fromNetString(source));
     }
 
     public ClientPlayer addPlayer(String source) throws IllegalArgumentException {
-        var parts = source.split(":");
-        if (parts.length != 3)
-            throw new IllegalArgumentException(String.format("Failed parsing player from source string '%s'\n", source));
-
-        try {
-            var player = new ClientPlayer(Integer.parseInt(parts[0]), parts[1], Integer.parseInt(parts[2]));
-            mPlayers.put(player.getId(), player);
-            return player;
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(String.format("Failed parsing player from source string '%s'\n", source));
-        }
+        var player = new ClientPlayer(source);
+        mPlayers.put(player.getId(), player);
+        return player;
     }
 
     public ClientPlayer removePlayer(int id) throws IllegalArgumentException {
         if (!mPlayers.containsKey(id))
-            throw new IllegalArgumentException(String.format("Cannot remove player: ID '%d' does not correspond to a player.\n", id));
+            throw new IllegalArgumentException(String.format("Cannot remove player: ID '%d' does not correspond to a player.", id));
 
         return mPlayers.remove(id);
     }
 
     public ClientPlayer getPlayer(int id) throws IllegalArgumentException {
         if (!mPlayers.containsKey(id))
-            throw new IllegalArgumentException(String.format("Cannot get player: ID '%d' does not correspond to a player.\n", id));
+            throw new IllegalArgumentException(String.format("Cannot get player: ID '%d' does not correspond to a player.", id));
 
         return mPlayers.get(id);
     }
@@ -117,38 +107,25 @@ public class ClientGame {
         return mId;
     }
 
-    // Server
-
-    public static Message fromGame(Object type, Card top, Collection<Player> players, int drawDeck, Player player) {
+    public static Message fromGame(Object type, Game game, Player player) {
         var cardsBuilder = new StringBuilder();
-        if (player != null) {
-            for (var card : player.getCards()) {
-                cardsBuilder.append(card.toString());
-                cardsBuilder.append(';');
-            }
+        for (var card : player.getCards()) {
+            cardsBuilder.append(card.toNetString());
+            cardsBuilder.append(';');
         }
 
         var playersBuilder = new StringBuilder();
-        if (players != null) {
-            for (var pl : players) {
-                playersBuilder.append(pl.toString());
-                playersBuilder.append(';');
-            }
+        for (var pl : game.getPlayers()) {
+            playersBuilder.append(pl.toString());
+            playersBuilder.append(';');
         }
 
+        var top = game.getDiscardTop();
         return new Message(type)
             .withInt(player.getId())
             .withString(playersBuilder.toString())
             .withString(cardsBuilder.toString())
-            .withString(top != null ? top.toString() : "")
-            .withInt(drawDeck);
-    }
-
-    public static Message fromGame(Object type, Game game, Player player) {
-        return fromGame(type,
-            game.getPileTop(),
-            game.getPlayers(),
-            game.getDrawDeckSize(),
-            player);
+            .withString(top != null ? top.toNetString() : "")
+            .withInt(game.getDrawDeckSize());
     }
 }
