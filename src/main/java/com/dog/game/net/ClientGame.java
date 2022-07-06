@@ -2,44 +2,16 @@ package com.dog.game.net;
 
 import java.util.*;
 
-import com.dog.game.Card;
-import com.dog.game.Game;
+import com.dog.game.*;
 import com.dog.net.DeserializationException;
 import com.dog.net.Message;
 
-class ClientPlayer {
-    private final int mId;
-    private final String mName;
-    private int mCards;
-
-    public ClientPlayer(int id, String name, int cards) {
-        mId    = id;
-        mName  = name;
-        mCards = cards;
-    }
-
-    public String getName() {
-        return mName;
-    }
-
-    public int getId() {
-        return mId;
-    }
-
-    public int getCards() {
-        return mCards;
-    }
-
-    public void setCards(int cards) {
-        mCards = cards;
-    }
-}
-
 public class ClientGame {
     private final Map<Integer, ClientPlayer> mPlayers = new LinkedHashMap<>();
-    private final List<Card> mCards = new ArrayList<>();
-    private final Card mTop;
+    private final Deck mCards = new Deck();
     private final int mId;
+    private Card mTop;
+    private int mDrawDeck;
 
     public ClientGame(Message message) throws DeserializationException {
         mId         = message.readInt();
@@ -47,6 +19,7 @@ public class ClientGame {
         var cards   = message.readString();
         var top     = message.readString();
         mTop        = top.isEmpty() ? null : Card.fromString(top);
+        mDrawDeck   = message.readInt();
 
         for (var player : players.split(";")) {
             if (player.isEmpty())
@@ -56,54 +29,75 @@ public class ClientGame {
                 System.out.printf("Failed parsing player string '%s'\n", player);
         }
 
+        var player = getPlayer(mId);
+        player.setCards(0);
         for (var card : cards.split(";")) {
             if (card.isEmpty())
                 continue;
-
-            if (addCard(card) == null)
+            
+            if (addCard(player, card) == null)
                 System.out.printf("Failed parsing card string '%s'\n", card);
         }
     }
 
-    public Card addCard(String source) {
-        try {
+    public Card addCard(ClientPlayer player, String source) throws IllegalArgumentException {
+        player.addCard();
+        if (isMyPlayer(player)) {
             var card = Card.fromString(source);
-            mCards.add(card);
+            mCards.add(0, card);
             return card;
-        } catch (IllegalArgumentException ex) {
-            return null;
         }
+
+        return null;
     }
 
-    public ClientPlayer addPlayer(String source) {
+    public void removeCard(ClientPlayer player, String source) throws IllegalArgumentException {
+        player.removeCard();
+        if (isMyPlayer(player))
+            mCards.remove(Card.fromString(source));
+    }
+
+    public ClientPlayer addPlayer(String source) throws IllegalArgumentException {
         var parts = source.split(":");
         if (parts.length != 3)
-            return null;
+            throw new IllegalArgumentException(String.format("Failed parsing player from source string '%s'\n", source));
 
         try {
             var player = new ClientPlayer(Integer.parseInt(parts[0]), parts[1], Integer.parseInt(parts[2]));
             mPlayers.put(player.getId(), player);
             return player;
         } catch (NumberFormatException ex) {
-            return null;
+            throw new IllegalArgumentException(String.format("Failed parsing player from source string '%s'\n", source));
         }
     }
 
-    public ClientPlayer removePlayer(int id) {
+    public ClientPlayer removePlayer(int id) throws IllegalArgumentException {
+        if (!mPlayers.containsKey(id))
+            throw new IllegalArgumentException(String.format("Cannot remove player: ID '%d' does not correspond to a player.\n", id));
+
         return mPlayers.remove(id);
     }
 
+    public ClientPlayer getPlayer(int id) throws IllegalArgumentException {
+        if (!mPlayers.containsKey(id))
+            throw new IllegalArgumentException(String.format("Cannot get player: ID '%d' does not correspond to a player.\n", id));
 
+        return mPlayers.get(id);
+    }
+    
+    public int getDrawDeck() {
+        return mDrawDeck;
+    }
 
-    public int getId() {
-        return mId;
+    public void setDrawDeck(int newCount) {
+        mDrawDeck = newCount;
     }
 
     public Map<Integer, ClientPlayer> getPlayers() {
         return mPlayers;
     }
 
-    public List<Card> getCards() {
+    public Deck getCards() {
         return mCards;
     }
 
@@ -111,9 +105,21 @@ public class ClientGame {
         return mTop;
     }
 
+    public void setTopCard(Card card) {
+        mTop = card;
+    }
+
+    public boolean isMyPlayer(ClientPlayer player) {
+        return player.getId() == mId;
+    }
+
+    public int getMyId() {
+        return mId;
+    }
+
     // Server
 
-    public static Message fromGame(Object type, Card top, Collection<Player> players, Player player) {
+    public static Message fromGame(Object type, Card top, Collection<Player> players, int drawDeck, Player player) {
         var cardsBuilder = new StringBuilder();
         if (player != null) {
             for (var card : player.getCards()) {
@@ -134,10 +140,15 @@ public class ClientGame {
             .withInt(player.getId())
             .withString(playersBuilder.toString())
             .withString(cardsBuilder.toString())
-            .withString(top != null ? top.toString() : "");
+            .withString(top != null ? top.toString() : "")
+            .withInt(drawDeck);
     }
 
     public static Message fromGame(Object type, Game game, Player player) {
-        return fromGame(type, game.getPileTop(), Arrays.asList(game.getPlayers()), player);
+        return fromGame(type,
+            game.getPileTop(),
+            game.getPlayers(),
+            game.getDrawDeckSize(),
+            player);
     }
 }

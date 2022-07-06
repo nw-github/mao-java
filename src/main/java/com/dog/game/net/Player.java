@@ -4,16 +4,16 @@ import com.dog.game.Deck;
 import com.dog.net.Connection;
 
 public class Player {
-    private final Connection mConn;
-    private final String     mName;
-    private final Deck       mCards = new Deck();
-    private final int        mId;
-    private boolean          mIsDealer = false;
+    private final Connection   mConn;
+    private final String       mName;
+    private final Deck         mCards    = new Deck();
+    private final int          mId;
+    private boolean            mIsDealer = false;
 
     public Player(Connection conn, int id, String name) {
-        mConn  = conn;
-        mName  = name;
-        mId    = id;
+        mConn = conn;
+        mName = name;
+        mId   = id;
     }
 
     public Deck getCards() {
