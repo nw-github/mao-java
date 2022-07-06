@@ -30,7 +30,6 @@ public class Connection implements Runnable {
 
                 mHandler.onRecvMessage(this, new Message(type, data));
             } catch (IOException ex) {
-                System.out.printf("IOException when reading: %s\n", ex.toString());
                 disconnect();
             }
         }
@@ -38,11 +37,11 @@ public class Connection implements Runnable {
 
     public void disconnect() {
         if (isConnected()) {
-            mHandler.onClose(this);
-
             Utils.close(mInput);
             Utils.close(mOutput);
             Utils.close(mSocket);
+            
+            mHandler.onClose(this);
         }
     }
 
@@ -62,13 +61,12 @@ public class Connection implements Runnable {
                 mOutput.writeInt(0);
             }
         } catch (IOException ex) {
-            System.out.printf("IOException when sending: %s\n", ex.toString());
             disconnect();
         }
     }
 
     public boolean isConnected() {
-        return mSocket != null && !mSocket.isClosed();
+        return !mSocket.isClosed();
     }
 
     @Override
