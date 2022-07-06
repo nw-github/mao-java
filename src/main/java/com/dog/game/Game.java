@@ -12,64 +12,64 @@ public class Game {
     public static final int MAX_PLAYERS = 8;
     private static final int STARTING_CARDS = 7;
 
-    private final List<Player> mPlayers = new ArrayList<>();
-    private final Deck         mDeck    = new Deck(); // The deck players draw/are punished from
-    private final Deck         mDiscard = new Deck(); // The deck players play into
-    private final Server       mServer;
-    private final int          mMaxPlayers;
-    private Suit               mSuit;
-    private int                mTurn       = 0;
-    private int                mPlayOrder  = +1; // +1 for clockwise, -1 for counterclockwise
-    private boolean            mHasStarted = false;
+    private final List<Player> players = new ArrayList<>();
+    private final Deck         deck    = new Deck(); // The deck players draw/are punished from
+    private final Deck         discard = new Deck(); // The deck players play into
+    private final Server       server;
+    private final int          maxPlayers;
+    private Suit               currentSuit;
+    private int                currentTurn = 0;
+    private int                playOrder   = +1; // +1 for clockwise, -1 for counterclockwise
+    private boolean            hasStarted  = false;
 
     public Game(Server server, int maxPlayers) {
-        mServer     = server;
-        mMaxPlayers = Utils.clamp(Game.MIN_PLAYERS, Game.MAX_PLAYERS, maxPlayers);
+        this.server     = server;
+        this.maxPlayers = Utils.clamp(Game.MIN_PLAYERS, Game.MAX_PLAYERS, maxPlayers);
     }
 
     public boolean start() {
-        if (mHasStarted || mPlayers.size() < MIN_PLAYERS)
+        if (hasStarted || players.size() < MIN_PLAYERS)
             return false;
 
         for (var suit : Suit.values())
             for (var face : Face.values())
-                mDeck.add(new Card(suit, face));
+                deck.add(new Card(suit, face));
 
-        mDeck.shuffle();
-        discard(mDeck, 0);
+        deck.shuffle();
+        discard(deck, 0);
 
-        for (var player : mPlayers)
+        for (var player : players)
             for (int i = 0; i < STARTING_CARDS; i++)
-                player.getCards().take(mDeck);
+                player.getCards().take(deck);
 
-        for (var player : mPlayers)
-            mServer.send(player.getConnection(), ClientGame.fromGame(ServerMessage.GAME_START, this, player));
+        for (var player : players)
+            server.send(player.getConnection(), ClientGame.fromGame(ServerMessage.GAME_START, this, player));
             
-        return mHasStarted = true;
+        return hasStarted = true;
     }
 
     public boolean canAddPlayer() {
-        return !isGameStarted() && mPlayers.size() < mMaxPlayers;
+        return !isGameStarted() && players.size() < maxPlayers;
     }
 
     public boolean addPlayer(Player player) {
         if (!canAddPlayer())
             return false;
 
-        mPlayers.add(player);
+        players.add(player);
         return true;
     }
 
     public boolean removePlayer(Player player) {
-        if (player != null && mPlayers.remove(player)) {
+        if (player != null && players.remove(player)) {
             if (isGameStarted()) {
                 while (player.getCards().size() != 0)
-                    mDeck.take(player.getCards());
+                    deck.take(player.getCards());
                 
-                mDeck.shuffle();
+                deck.shuffle();
 
-                if (mPlayers.size() == 1)
-                    endGame(mPlayers.get(0));
+                if (players.size() == 1)
+                    endGame(players.get(0));
             }
             return true;
         }
@@ -78,11 +78,11 @@ public class Game {
     }
 
     public boolean isGameStarted() {
-        return mHasStarted;
+        return hasStarted;
     }
 
     public int getMaxPlayers() {
-        return mMaxPlayers;
+        return maxPlayers;
     }
 
     /**
@@ -98,16 +98,16 @@ public class Game {
         if (!isGameStarted())
             throw new GameException("Cannot play before the game has started.");
         
-        int index = mPlayers.indexOf(player);
+        int index = players.indexOf(player);
         if (index == -1 || cardIndex >= player.getCards().size())
             throw new IllegalArgumentException("Player or card index is invalid.");
 
-        boolean validTurn = index == mTurn;
+        boolean validTurn = index == currentTurn;
         if (cardIndex >= 0) {
             var valid = isValidMove(player.getCards().get(cardIndex));
             var card  = discard(player.getCards(), cardIndex);
 
-            mServer.sendAll(new Message(ServerMessage.PLAY)
+            server.sendAll(new Message(ServerMessage.PLAY)
                 .withInt(player.getId())
                 .withString(userText)
                 .withString(card.toNetString()));
@@ -119,14 +119,14 @@ public class Game {
 
             switch (card.face()) {
             case JACK:
-                mPlayOrder = mPlayOrder == +1 ? -1 : +1;
+                playOrder = playOrder == +1 ? -1 : +1;
                 break;
             case SEVEN:
-                punish(mPlayers.get(nextPlayer()), "Have a nice day!");
+                punish(players.get(nextPlayer()), "Have a nice day!");
                 break;
             case ACE:
                 if (validTurn)
-                    mTurn = nextPlayer();
+                    currentTurn = nextPlayer();
                 break;
             default:
                 break;
@@ -138,72 +138,72 @@ public class Game {
         if (!validTurn)
             punish(player, "Playing out of turn.");
         else
-            mTurn = nextPlayer();
+            currentTurn = nextPlayer();
 
         if (player.getCards().size() == 0)
             endGame(player);
     }
 
     public List<Player> getPlayers() {
-        return mPlayers;
+        return players;
     }
 
     public Card getDiscardTop() {
-        if (mDiscard.size() != 0)
-            return mDiscard.top();
+        if (discard.size() != 0)
+            return discard.top();
         return null;
     }
 
     public int getDrawDeckSize() {
-        return mDeck.size();
+        return deck.size();
     }
 
     public void punish(Player player, String reason) throws IllegalArgumentException, GameException {
         if (!isGameStarted())
             throw new GameException("Cannot play before the game has started.");
-        if (mPlayers.indexOf(player) == -1)
+        if (players.indexOf(player) == -1)
             throw new IllegalArgumentException("Player is invalid.");
 
-        if (mDeck.size() > 0)
+        if (deck.size() > 0)
         {
-            var card = player.getCards().take(mDeck);
-            if (mDeck.size() == 0)
+            var card = player.getCards().take(deck);
+            if (deck.size() == 0)
             {
-                var top = mDiscard.top();
-                mDiscard.remove(top);
+                var top = discard.top();
+                discard.remove(top);
 
-                mDeck.addAll(mDiscard);
-                mDeck.shuffle();
+                deck.addAll(discard);
+                deck.shuffle();
 
-                mDiscard.clear();
-                mDiscard.add(top);
+                discard.clear();
+                discard.add(top);
             }
 
-            mServer.sendAllExcept(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+            server.sendAllExcept(player.getConnection(), new Message(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
                 .withString("")
                 .withString(reason)
-                .withInt(mDeck.size()));
-            mServer.send(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+                .withInt(deck.size()));
+            server.send(player.getConnection(), new Message(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
                 .withString(card.toNetString())
                 .withString(reason)
-                .withInt(mDeck.size()));
+                .withInt(deck.size()));
         }
     }
 
     // Utility
 
     private boolean isValidMove(Card card) {
-        return (card.face() == mDiscard.top().face()) ||
-            (card.suit() == mSuit);
+        return (card.face() == discard.top().face()) ||
+            (card.suit() == currentSuit);
     }
 
     private int nextPlayer() {
-        int turn = mTurn + mPlayOrder;
+        int turn = currentTurn + playOrder;
         if (turn < 0)
-            turn = mPlayers.size() - 1;
-        if (turn == mPlayers.size())
+            turn = players.size() - 1;
+        if (turn == players.size())
             turn = 0;
         return turn;
     }
@@ -256,7 +256,7 @@ public class Game {
     private boolean matchText(Card card, ArrayList<String> phrases, String userText) {
         if (card.face() == Face.JACK) {
             try {
-                mSuit = Suit.valueOf(userText);
+                currentSuit = Suit.valueOf(userText);
                 return true;
             } catch (IllegalArgumentException ex) { }
         }
@@ -301,17 +301,17 @@ public class Game {
 
     private Card discard(Deck deck, int index) {
         var card = deck.get(index);
-        mDiscard.take(deck, index);
+        discard.take(deck, index);
 
-        mSuit = card.suit();
+        currentSuit = card.suit();
         return card;
     }
 
     private void endGame(Player winner) {
-        mServer.sendAll(new Message(ServerMessage.GAME_END)
+        server.sendAll(new Message(ServerMessage.GAME_END)
             .withInt(winner.getId()));
 
-        mHasStarted = false;
-        mServer.stop(); // TODO: reset server/go back to lobby
+        hasStarted = false;
+        server.stop(); // TODO: reset server/go back to lobby
     }
 }

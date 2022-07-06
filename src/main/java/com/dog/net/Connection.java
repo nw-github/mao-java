@@ -6,29 +6,29 @@ import java.net.Socket;
 import com.dog.Utils;
 
 public class Connection implements Runnable {
-    private Socket mSocket;
-    private DataInputStream mInput;
-    private DataOutputStream mOutput;
-    private ConnectionHandler mHandler;
+    private final ConnectionHandler handler;
+    private final Socket            socket;
+    private final DataInputStream   input;
+    private final DataOutputStream  output;
 
     public Connection(ConnectionHandler handler, Socket socket) throws IOException {
-        mHandler = handler;
-        mSocket  = socket;
-        mInput   = new DataInputStream(mSocket.getInputStream());
-        mOutput  = new DataOutputStream(mSocket.getOutputStream());
+        this.handler = handler;
+        this.socket  = socket;
+        this.input   = new DataInputStream(socket.getInputStream());
+        this.output  = new DataOutputStream(socket.getOutputStream());
     }
 
     @Override
     public void run() {
         while (isConnected()) {
             try {
-                String type = mInput.readUTF();
-                int length  = mInput.readInt();
+                String type = input.readUTF();
+                int length  = input.readInt();
                 byte[] data = null;
                 if (length > 0)
-                    data = mInput.readNBytes(length);
+                    data = input.readNBytes(length);
 
-                mHandler.onRecvMessage(this, new Message(type, data));
+                handler.onRecvMessage(this, new Message(type, data));
             } catch (IOException ex) {
                 disconnect();
             }
@@ -37,28 +37,27 @@ public class Connection implements Runnable {
 
     public void disconnect() {
         if (isConnected()) {
-            Utils.close(mInput);
-            Utils.close(mOutput);
-            Utils.close(mSocket);
+            Utils.close(input);
+            Utils.close(output);
+            Utils.close(socket);
             
-            mHandler.onClose(this);
+            handler.onClose(this);
         }
     }
 
-    // TODO: better message system
     public void send(Message message) {
         if (!isConnected())
             return;
 
         try {
-            mOutput.writeUTF(message.type());
+            output.writeUTF(message.type());
             
             var data = message.data();
             if (data != null && data.length != 0) {
-                mOutput.writeInt(data.length);
-                mOutput.write(data);
+                output.writeInt(data.length);
+                output.write(data);
             } else {
-                mOutput.writeInt(0);
+                output.writeInt(0);
             }
         } catch (IOException ex) {
             disconnect();
@@ -66,13 +65,13 @@ public class Connection implements Runnable {
     }
 
     public boolean isConnected() {
-        return !mSocket.isClosed();
+        return !socket.isClosed();
     }
 
     @Override
     public String toString() {
         return String.format("%s:%d",
-            mSocket.getInetAddress().toString(),
-            mSocket.getPort());
+            socket.getInetAddress().toString(),
+            socket.getPort());
     }
 }

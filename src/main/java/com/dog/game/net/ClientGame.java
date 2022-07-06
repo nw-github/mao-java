@@ -7,19 +7,19 @@ import com.dog.net.DeserializationException;
 import com.dog.net.Message;
 
 public class ClientGame {
-    private final Map<Integer, ClientPlayer> mPlayers = new LinkedHashMap<>();
-    private final Deck mCards = new Deck();
-    private final int mId;
-    private Card mTop;
-    private int mDrawDeck;
+    private final Map<Integer, ClientPlayer> players = new LinkedHashMap<>();
+    private final Deck cards = new Deck();
+    private final int id;
+    private Card top;
+    private int drawDeck;
 
     public ClientGame(Message message) throws DeserializationException, IllegalArgumentException {
-        mId         = message.readInt();
-        var players = message.readString();
-        var cards   = message.readString();
-        var top     = message.readString();
-        mTop        = top.isEmpty() ? null : Card.fromNetString(top);
-        mDrawDeck   = message.readInt();
+        this.id       = message.readInt();
+        var players   = message.readString();
+        var cards     = message.readString();
+        var top       = message.readString();
+        this.top      = top.isEmpty() ? null : Card.fromNetString(top);
+        this.drawDeck = message.readInt();
 
         for (var player : players.split(";")) {
             if (player.isEmpty())
@@ -28,7 +28,7 @@ public class ClientGame {
             addPlayer(player);
         }
 
-        var player = getPlayer(mId);
+        var player = getPlayer(id);
         player.setCards(0);
         for (var card : cards.split(";")) {
             if (card.isEmpty())
@@ -42,7 +42,7 @@ public class ClientGame {
         player.addCard();
         if (isMyPlayer(player)) {
             var card = Card.fromNetString(source);
-            mCards.add(0, card);
+            cards.add(0, card);
             return card;
         }
 
@@ -52,59 +52,59 @@ public class ClientGame {
     public void removeCard(ClientPlayer player, String source) throws IllegalArgumentException {
         player.removeCard();
         if (isMyPlayer(player))
-            mCards.remove(Card.fromNetString(source));
+            cards.remove(Card.fromNetString(source));
     }
 
     public ClientPlayer addPlayer(String source) throws IllegalArgumentException {
         var player = new ClientPlayer(source);
-        mPlayers.put(player.getId(), player);
+        players.put(player.getId(), player);
         return player;
     }
 
     public ClientPlayer removePlayer(int id) throws IllegalArgumentException {
-        if (!mPlayers.containsKey(id))
+        if (!players.containsKey(id))
             throw new IllegalArgumentException(String.format("Cannot remove player: ID '%d' does not correspond to a player.", id));
 
-        return mPlayers.remove(id);
+        return players.remove(id);
     }
 
     public ClientPlayer getPlayer(int id) throws IllegalArgumentException {
-        if (!mPlayers.containsKey(id))
+        if (!players.containsKey(id))
             throw new IllegalArgumentException(String.format("Cannot get player: ID '%d' does not correspond to a player.", id));
 
-        return mPlayers.get(id);
+        return players.get(id);
     }
     
     public int getDrawDeck() {
-        return mDrawDeck;
+        return drawDeck;
     }
 
     public void setDrawDeck(int newCount) {
-        mDrawDeck = newCount;
+        drawDeck = newCount;
     }
 
     public Map<Integer, ClientPlayer> getPlayers() {
-        return mPlayers;
+        return players;
     }
 
     public Deck getCards() {
-        return mCards;
+        return cards;
     }
 
     public Card getTopCard() {
-        return mTop;
+        return top;
     }
 
     public void setTopCard(Card card) {
-        mTop = card;
+        top = card;
     }
 
     public boolean isMyPlayer(ClientPlayer player) {
-        return player.getId() == mId;
+        return player.getId() == id;
     }
 
     public int getMyId() {
-        return mId;
+        return id;
     }
 
     public static Message fromGame(Object type, Game game, Player player) {

@@ -1,9 +1,9 @@
 package com.dog.game.net;
 
 public class ClientPlayer {
-    private final int mId;
-    private final String mName;
-    private int mCards;
+    private final int id;
+    private final String name;
+    private int cards;
 
     // see Player::toString()
     public ClientPlayer(String playerString) throws IllegalArgumentException {
@@ -12,35 +12,35 @@ public class ClientPlayer {
             throw new IllegalArgumentException("The source string was not correctly formatted.");
 
         try {
-            mId    = Integer.parseInt(parts[0]);
-            mName  = parts[1];
-            mCards = Integer.parseInt(parts[2]);
+            id    = Integer.parseInt(parts[0]);
+            name  = parts[1];
+            cards = Integer.parseInt(parts[2]);
         } catch (NumberFormatException ex) {
             throw new IllegalArgumentException("The numbers could not be parsed.");
         }
     }
 
     public String getName() {
-        return mName;
+        return name;
     }
 
     public int getId() {
-        return mId;
+        return id;
     }
 
     public int getCards() {
-        return mCards;
+        return cards;
     }
 
     public void setCards(int cards) {
-        mCards = cards;
+        this.cards = cards;
     }
 
     public void removeCard() {
-        mCards--;
+        cards--;
     }
 
     public void addCard() {
-        mCards++;
+        cards++;
     }
 }

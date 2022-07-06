@@ -6,18 +6,17 @@ import java.net.Socket;
 import com.dog.Utils;
 
 public abstract class Client implements Runnable, ConnectionHandler {
-    private final String mHost;
-    private final int mPort;
-    private final int mMaxAttepts;
-    private final int mTimeout;
-
-    private Connection mConn;
+    private final String host;
+    private final int    port;
+    private final int    maxAttempts;
+    private final int    timeout;
+    private Connection   conn;
 
     public Client(String host, int port, int maxAttempts, int timeout) {
-        mHost       = host;
-        mPort       = port;
-        mMaxAttepts = maxAttempts;
-        mTimeout    = timeout;
+        this.host        = host;
+        this.port        = port;
+        this.maxAttempts = maxAttempts;
+        this.timeout     = timeout;
     }
 
     public abstract void onConnect();
@@ -33,30 +32,29 @@ public abstract class Client implements Runnable, ConnectionHandler {
         if (isRunning())
             return;
 
-        for (int i = 0; i < mMaxAttepts; i++) {
+        for (int i = 0; i < maxAttempts; i++) {
             try {
-                var socket = new Socket(mHost, mPort);
-                mConn = new Connection(this, socket);
+                conn = new Connection(this, new Socket(host, port));
                 onConnect();
-                mConn.run();
+                conn.run();
                 return;
             } catch (IOException ex) {
-                Utils.sleep(mTimeout);
+                Utils.sleep(timeout);
                 continue;
             }
         }
     }
 
     public void stop() {
-        mConn.disconnect();
-        mConn = null;
+        conn.disconnect();
+        conn = null;
     }
 
     public void send(Message message) {
-        mConn.send(message);
+        conn.send(message);
     }
 
     public boolean isRunning() {
-        return mConn != null;
+        return conn != null;
     }
 }

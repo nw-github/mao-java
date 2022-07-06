@@ -7,13 +7,13 @@ import java.util.*;
 import com.dog.Utils;
 
 public abstract class Server implements Runnable, ConnectionHandler {
-    private final int mPort;
-    private ServerSocket mSocket;
-    private Map<Connection, Thread> mConns = new HashMap<>();
-    private boolean mIsRunning = false;
+    private final Map<Connection, Thread> conns = new HashMap<>();
+    private final int port;
+    private ServerSocket socket;
+    private boolean isRunning = false;
 
     public Server(int port) {
-        mPort = port;
+        this.port = port;
     }
 
     public abstract boolean onConnect(Connection conn);
@@ -21,9 +21,9 @@ public abstract class Server implements Runnable, ConnectionHandler {
 
     @Override
     public void onClose(Connection conn) {
-        synchronized(mConns) {
-            if (mConns.containsKey(conn)) {
-                mConns.remove(conn);
+        synchronized(conns) {
+            if (conns.containsKey(conn)) {
+                conns.remove(conn);
                 onDisconnect(conn);
             }
         }
@@ -35,8 +35,8 @@ public abstract class Server implements Runnable, ConnectionHandler {
             return;
 
         try {
-            mSocket = new ServerSocket(mPort);
-            mIsRunning = true;
+            socket = new ServerSocket(port);
+            isRunning = true;
         } catch (Throwable ex) {
             System.out.printf("Exception starting server: '%s'!\n", ex.toString());
             return;
@@ -44,15 +44,15 @@ public abstract class Server implements Runnable, ConnectionHandler {
 
         while (isRunning()) {
             try {
-                var conn = new Connection(this, mSocket.accept());
-                synchronized (mConns) {
+                var conn = new Connection(this, socket.accept());
+                synchronized (conns) {
                     if (!isRunning()) {
                         conn.disconnect();
                         return;
                     }
 
-                    mConns.put(conn, new Thread(conn));
-                    mConns.get(conn).start();
+                    conns.put(conn, new Thread(conn));
+                    conns.get(conn).start();
                 }
             } catch (IOException ex) {
                 System.out.printf("Exception while running server: '%s'!\n", ex.toString());
@@ -62,12 +62,12 @@ public abstract class Server implements Runnable, ConnectionHandler {
     }
 
     public void stop() {
-        mIsRunning = false;
+        isRunning = false;
 
         for (var conn : getConnections())
             conn.disconnect();
 
-        Utils.close(mSocket);
+        Utils.close(socket);
     }
 
     public void send(Connection target, Message message) {
@@ -85,12 +85,12 @@ public abstract class Server implements Runnable, ConnectionHandler {
     }
 
     public boolean isRunning() {
-        return mIsRunning;
+        return isRunning;
     }
 
     public Connection[] getConnections() {
-        synchronized (mConns) {
-            return mConns.keySet().toArray(new Connection[mConns.size()]);
+        synchronized (conns) {
+            return conns.keySet().toArray(new Connection[conns.size()]);
         }
     }
 }

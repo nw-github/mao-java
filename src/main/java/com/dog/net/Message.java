@@ -3,14 +3,14 @@ package com.dog.net;
 import java.util.Arrays;
 
 public class Message {
-    private String mType;
-    private byte[] mData;
-    private int mDataPointer = 0;
+    private String type;
+    private byte[] data;
+    private int dataPointer = 0;
 
     public Message(String type, byte[] data)
     {
-        mType = type;
-        mData = data;
+        this.type = type;
+        this.data = data;
     }
 
     public Message(Object type, byte[] data)
@@ -28,20 +28,21 @@ public class Message {
         this(type, null);
     }
 
-    public String type() { return mType; }
+    public String type() { return type; }
     
-    public byte[] data() { return mData; }
+    public byte[] data() { return data; }
 
     // --------------------------
 
     private void appendBytes(byte[] data) {
-        if (mData != null && mData.length > 0) {
-            var result = Arrays.copyOf(mData, mData.length + data.length);
+        if (this.data != null && this.data.length > 0) {
+            var result = Arrays.copyOf(this.data, this.data.length + data.length);
             for (int i = 0; i < data.length; i++)
-                result[i + mData.length] = data[i];
-            mData = result;
+                result[i + this.data.length] = data[i];
+            
+            this.data = result;
         } else {
-            mData = data;
+            this.data = data;
         }
     }
 
@@ -72,16 +73,16 @@ public class Message {
     // --------------------------
 
     public void seek(int pos) {
-        mDataPointer = pos;
+        dataPointer = pos;
     }
 
     public byte nextByte() {
-        return mData[mDataPointer++];
+        return data[dataPointer++];
     }
 
     public String readString() throws DeserializationException {
         int length = readInt();
-        if (mDataPointer + length * 2 > mData.length)
+        if (dataPointer + length * 2 > data.length)
             throw new DeserializationException("Couldn't deserialize string.");
 
         var result = new char[length];
@@ -93,7 +94,7 @@ public class Message {
     }
 
     public int readInt() throws DeserializationException {
-        if (mDataPointer + 4 > mData.length)
+        if (dataPointer + 4 > data.length)
             throw new DeserializationException("Couldn't deserialize int.");
 
         int result = 0;
