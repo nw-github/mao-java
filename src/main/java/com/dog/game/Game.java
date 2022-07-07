@@ -4,7 +4,7 @@ import java.util.*;
 
 import com.dog.Utils;
 import com.dog.game.net.*;
-import com.dog.net.Message;
+import com.dog.net.MessageBuilder;
 import com.dog.net.Server;
 
 public class Game {
@@ -12,64 +12,66 @@ public class Game {
     public static final int MAX_PLAYERS = 8;
     private static final int STARTING_CARDS = 7;
 
-    private final List<Player> mPlayers = new ArrayList<>();
-    private final Deck         mDeck    = new Deck(); // The deck players draw/are punished from
-    private final Deck         mDiscard = new Deck(); // The deck players play into
-    private final Server       mServer;
-    private final int          mMaxPlayers;
-    private Suit               mSuit;
-    private int                mTurn       = 0;
-    private int                mPlayOrder  = +1; // +1 for clockwise, -1 for counterclockwise
-    private boolean            mHasStarted = false;
+    private final List<Player> players = new ArrayList<>();
+    private final Deck         deck    = new Deck(); // The deck players draw/are punished from
+    private final Deck         discard = new Deck(); // The deck players play into
+    private final Server       server;
+    private final int          maxPlayers;
+    private Suit               currentSuit;
+    private int                currentTurn = 0;
+    private int                playOrder   = +1; // +1 for clockwise, -1 for counterclockwise
+    private boolean            hasStarted  = false;
 
     public Game(Server server, int maxPlayers) {
-        mServer     = server;
-        mMaxPlayers = Utils.clamp(Game.MIN_PLAYERS, Game.MAX_PLAYERS, maxPlayers);
+        this.server     = server;
+        this.maxPlayers = Utils.clamp(Game.MIN_PLAYERS, Game.MAX_PLAYERS, maxPlayers);
     }
 
     public boolean start() {
-        if (mHasStarted || mPlayers.size() < MIN_PLAYERS)
+        if (hasStarted || players.size() < MIN_PLAYERS)
             return false;
 
         for (var suit : Suit.values())
             for (var face : Face.values())
-                mDeck.add(new Card(suit, face));
+                deck.add(new Card(suit, face));
 
-        mDeck.shuffle();
-        discard(mDeck, 0);
+        deck.shuffle();
+        discard(deck, 0);
 
-        for (var player : mPlayers)
+        for (var player : players)
             for (int i = 0; i < STARTING_CARDS; i++)
-                player.getCards().take(mDeck);
+                player.getCards().take(deck);
 
-        for (var player : mPlayers)
-            mServer.send(player.getConnection(), ClientGame.fromGame(ServerMessage.GAME_START, this, player));
+        for (var player : players)
+            server.send(player.getConnection(), new MessageBuilder(ServerMessage.GAME_START)
+                .withJson(new ClientGame(this, player))
+                .build());
             
-        return mHasStarted = true;
+        return hasStarted = true;
     }
 
     public boolean canAddPlayer() {
-        return !isGameStarted() && mPlayers.size() < mMaxPlayers;
+        return !isGameStarted() && players.size() < maxPlayers;
     }
 
     public boolean addPlayer(Player player) {
         if (!canAddPlayer())
             return false;
 
-        mPlayers.add(player);
+        players.add(player);
         return true;
     }
 
     public boolean removePlayer(Player player) {
-        if (player != null && mPlayers.remove(player)) {
+        if (player != null && players.remove(player)) {
             if (isGameStarted()) {
                 while (player.getCards().size() != 0)
-                    mDeck.take(player.getCards());
+                    deck.take(player.getCards());
                 
-                mDeck.shuffle();
+                deck.shuffle();
 
-                if (mPlayers.size() == 1)
-                    endGame(mPlayers.get(0));
+                if (players.size() == 1)
+                    endGame(players.get(0));
             }
             return true;
         }
@@ -78,55 +80,54 @@ public class Game {
     }
 
     public boolean isGameStarted() {
-        return mHasStarted;
+        return hasStarted;
     }
 
     public int getMaxPlayers() {
-        return mMaxPlayers;
+        return maxPlayers;
     }
 
     /**
      * Play or draw a card for a specific player.
      * @param player Target player
-     * @param cardIndex Index into the players cards to play. 
-     *  A negative index is treated as drawing a card.
-     * @param userText  The user's input text
-     * @throws IllegalArgumentException Thrown if the card index >= the player's deck size or the player is invalid
+     * @param card The card to play, pass 'null' to draw a card
+     * @param userText The user's input text
+     * @throws IllegalArgumentException Thrown if the card is not in the player's deck or the player is invalid
      * @throws GameException Thrown if the game hasn't started
      */
-    public void play(Player player, int cardIndex, String userText) throws IllegalArgumentException, GameException {
+    public void play(Player player, Card card, String userText) throws IllegalArgumentException, GameException {
         if (!isGameStarted())
             throw new GameException("Cannot play before the game has started.");
         
-        int index = mPlayers.indexOf(player);
-        if (index == -1 || cardIndex >= player.getCards().size())
-            throw new IllegalArgumentException("Player or card index is invalid.");
+        int index = players.indexOf(player);
+        if (index == -1 || (card != null && !player.getCards().contains(card)))
+            throw new IllegalArgumentException("Player or card is invalid.");
 
-        boolean validTurn = index == mTurn;
-        if (cardIndex >= 0) {
-            var valid = isValidMove(player.getCards().get(cardIndex));
-            var card  = discard(player.getCards(), cardIndex);
+        boolean validTurn = index == currentTurn;
+        if (card != null) {
+            var valid = isValidMove(card);
+            discard(player.getCards(), player.getCards().indexOf(card));
 
-            mServer.sendAll(new Message(ServerMessage.PLAY)
+            server.sendAll(new MessageBuilder(ServerMessage.PLAY)
                 .withInt(player.getId())
                 .withString(userText)
-                .withString(card.toString()));
+                .withJson(card)
+                .build());
 
             if (!valid)
                 punish(player, "Invalid move.");  // TODO: i dont remember what the reason given for an invalid move usually is            
 
             checkText(player, card, userText);
-
             switch (card.face()) {
             case JACK:
-                mPlayOrder = mPlayOrder == +1 ? -1 : +1;
+                playOrder = playOrder == +1 ? -1 : +1;
                 break;
             case SEVEN:
-                punish(mPlayers.get(nextPlayer()), "Have a nice day!");
+                punish(players.get(nextPlayer()), "Have a nice day!");
                 break;
             case ACE:
                 if (validTurn)
-                    mTurn = nextPlayer();
+                    currentTurn = nextPlayer();
                 break;
             default:
                 break;
@@ -138,70 +139,74 @@ public class Game {
         if (!validTurn)
             punish(player, "Playing out of turn.");
         else
-            mTurn = nextPlayer();
+            currentTurn = nextPlayer();
 
         if (player.getCards().size() == 0)
             endGame(player);
     }
 
     public List<Player> getPlayers() {
-        return mPlayers;
+        return players;
     }
 
-    public Card getPileTop() {
-        return mDiscard.top();
+    public Card getDiscardTop() {
+        if (discard.size() != 0)
+            return discard.top();
+        return null;
     }
 
     public int getDrawDeckSize() {
-        return mDeck.size();
+        return deck.size();
     }
 
     public void punish(Player player, String reason) throws IllegalArgumentException, GameException {
         if (!isGameStarted())
             throw new GameException("Cannot play before the game has started.");
-        if (mPlayers.indexOf(player) == -1)
+        if (players.indexOf(player) == -1)
             throw new IllegalArgumentException("Player is invalid.");
 
-        if (mDeck.size() > 0)
+        if (deck.size() > 0)
         {
-            var card = player.getCards().take(mDeck);
-            if (mDeck.size() == 0)
+            var card = player.getCards().take(deck);
+            if (deck.size() == 0)
             {
-                var top = mDiscard.top();
-                mDiscard.remove(top);
+                var top = discard.top();
+                discard.remove(top);
 
-                mDeck.addAll(mDiscard);
-                mDeck.shuffle();
+                deck.addAll(discard);
+                deck.shuffle();
 
-                mDiscard.clear();
-                mDiscard.add(top);
+                discard.clear();
+                discard.add(top);
             }
 
-            mServer.sendAllExcept(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+            server.sendAllExcept(player.getConnection(), new MessageBuilder(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
-                .withString("")
+                .withJson(null)
                 .withString(reason)
-                .withInt(mDeck.size()));
-            mServer.send(player.getConnection(), new Message(ServerMessage.RECV_CARD)
+                .withInt(deck.size())
+                .build());
+            server.send(player.getConnection(), new MessageBuilder(ServerMessage.RECV_CARD)
                 .withInt(player.getId())
-                .withString(card.toString())
+                .withJson(card)
                 .withString(reason)
-                .withInt(mDeck.size()));
+                .withInt(deck.size())
+                .build());
         }
     }
 
     // Utility
 
     private boolean isValidMove(Card card) {
-        return (card.face() == mDiscard.top().face()) ||
-            (card.suit() == mSuit);
+        return (card.face() == discard.top().face()) ||
+            (card.suit() == currentSuit);
     }
 
     private int nextPlayer() {
-        int turn = mTurn + mPlayOrder;
+        int turn = currentTurn + playOrder;
         if (turn < 0)
-            turn = mPlayers.size() - 1;
-        if (turn == mPlayers.size())
+            turn = players.size() - 1;
+        if (turn == players.size())
             turn = 0;
         return turn;
     }
@@ -212,28 +217,29 @@ public class Game {
         var phrases = new ArrayList<String>();
         switch (card.face()) {
         case JACK:
-            phrases.add("here comes the badger" + spades);
+            phrases.add("Here comes the badger" + spades);
             break;
         case QUEEN:
-            phrases.add("all hail the queen" + spades);
+            phrases.add("All hail the queen" + spades);
             break;
         case KING:
-            phrases.add("all hail the king" + spades);
+            phrases.add("All hail the king" + spades);
             break;
         default:
             if (card.suit() == Suit.SPADES)
-                phrases.add(String.format("%s of spades", card.face().toString()));
+                phrases.add(card.toString());
             
             if (card.face() == Face.SEVEN)
-                phrases.add("have a nice day");
+                phrases.add("Have a nice day");
+
             break;
         }
 
         if (player.getCards().size() == 1)
-            phrases.add("mao");
+            phrases.add("Mao");
 
         if (player.getCards().size() == 0)
-            phrases.add("all hail the king of mao");
+            phrases.add("All hail the king of Mao");
 
         var parts = Arrays.asList(userText.split("\n"));
         var it    = parts.iterator();
@@ -253,7 +259,7 @@ public class Game {
     private boolean matchText(Card card, ArrayList<String> phrases, String userText) {
         if (card.face() == Face.JACK) {
             try {
-                mSuit = Suit.valueOf(userText);
+                currentSuit = Suit.valueOf(userText);
                 return true;
             } catch (IllegalArgumentException ex) { }
         }
@@ -269,24 +275,44 @@ public class Game {
         return false;
     }
 
-    private boolean compare(String userText, String target) {
-        // TODO: compare less rigidly to allow typos/punctuation
-        return userText.toLowerCase().strip().equals(target.toLowerCase());
+    private static boolean compare(String userText, String target) {
+        var replacements = new String[][] {
+            {"1", "ace"},
+            {"a", "ace"},
+            {"2", "two"},
+            {"3", "three"},
+            {"4", "four"},
+            {"5", "five"},
+            {"6", "six"},
+            {"7", "seven"},
+            {"8", "eight"},
+            {"9", "nine"},
+            {"j", "jack"},
+            {"q", "queen"},
+            {"k", "king"},
+        };
+
+        userText = userText.toLowerCase().strip();
+        for (var pair : replacements)
+            userText.replace(pair[0], pair[1]);
+
+        if (Utils.endsWithAny(userText, ".", "!", "?"))
+            userText = userText.substring(0, userText.length() - 1);
+
+        return userText.equals(target.toLowerCase());
     }
 
-    private Card discard(Deck deck, int index) {
-        var card = deck.get(index);
-        mDiscard.take(deck, index);
-
-        mSuit = card.suit();
-        return card;
+    private void discard(Deck deck, int index) {
+        currentSuit = deck.get(index).suit();
+        discard.take(deck, index);
     }
 
     private void endGame(Player winner) {
-        mServer.sendAll(new Message(ServerMessage.GAME_END)
-            .withInt(winner.getId()));
+        server.sendAll(new MessageBuilder(ServerMessage.GAME_END)
+            .withInt(winner.getId())
+            .build());
 
-        mHasStarted = false;
-        // TODO: reset server/go back to lobby
+        hasStarted = false;
+        server.stop(); // TODO: reset server/go back to lobby
     }
 }

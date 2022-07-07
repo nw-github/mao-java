@@ -7,12 +7,13 @@ import java.util.*;
 import com.dog.Utils;
 
 public abstract class Server implements Runnable, ConnectionHandler {
-    private ServerSocket mSocket;
-    private List<Connection> mConns = new ArrayList<>();
-    private final int mPort;
+    private final Map<Connection, Thread> conns = new HashMap<>();
+    private final int port;
+    private ServerSocket socket;
+    private boolean isRunning = false;
 
     public Server(int port) {
-        mPort = port;
+        this.port = port;
     }
 
     public abstract boolean onConnect(Connection conn);
@@ -20,10 +21,11 @@ public abstract class Server implements Runnable, ConnectionHandler {
 
     @Override
     public void onClose(Connection conn) {
-        if (mConns.indexOf(conn) != -1)
-        {
-            onDisconnect(conn);
-            mConns.remove(conn);
+        synchronized(conns) {
+            if (conns.containsKey(conn)) {
+                conns.remove(conn);
+                onDisconnect(conn);
+            }
         }
     }
 
@@ -33,41 +35,39 @@ public abstract class Server implements Runnable, ConnectionHandler {
             return;
 
         try {
-            mSocket = new ServerSocket(mPort);
-        } catch (Throwable ex) { // UnknownHostException, IOException
+            socket = new ServerSocket(port);
+            isRunning = true;
+        } catch (Throwable ex) {
+            System.out.printf("Exception starting server: '%s'!\n", ex.toString());
             return;
         }
 
-        while (!mSocket.isClosed()) {
+        while (isRunning()) {
             try {
-                var socket = mSocket.accept();
-                var conn   = new Connection(this, socket);
-                if (onConnect(conn)) {
-                    new Thread(conn).start(); // TODO: add to list and join() in close()
+                var conn = new Connection(this, socket.accept());
+                synchronized (conns) {
+                    if (!isRunning()) {
+                        conn.disconnect();
+                        return;
+                    }
 
-                    System.out.printf("Received connection from %s:%d!\n",
-                        socket.getInetAddress().toString(), socket.getPort());
-                    mConns.add(conn);
-                } else {
-                    System.out.printf("Rejected connection from %s:%d!\n",
-                        socket.getInetAddress().toString(), socket.getPort());
-
-                    conn.disconnect();
+                    conns.put(conn, new Thread(conn));
+                    conns.get(conn).start();
                 }
             } catch (IOException ex) {
-                System.out.printf("Exception while accepting client: '%s'!\n", ex.toString());
+                System.out.printf("Exception while running server: '%s'!\n", ex.toString());
                 continue;
             }
         }
     }
 
     public void stop() {
-        for (var conn : mConns)
+        isRunning = false;
+
+        for (var conn : getConnections())
             conn.disconnect();
-        
-        mConns.clear();
-        Utils.close(mSocket);
-        mSocket = null;
+
+        Utils.close(socket);
     }
 
     public void send(Connection target, Message message) {
@@ -75,21 +75,22 @@ public abstract class Server implements Runnable, ConnectionHandler {
     }
 
     public void sendAll(Message message) {
-        for (var conn : mConns)
-            conn.send(message);
+        sendAllExcept(null, message);
     }
 
     public void sendAllExcept(Connection exclude, Message message) {
-        for (var conn : mConns)
+        for (var conn : getConnections())
             if (conn != exclude)
                 conn.send(message);
     }
 
     public boolean isRunning() {
-        return mSocket != null;
+        return isRunning;
     }
 
-    protected List<Connection> getConnections() {
-        return mConns;
+    public Connection[] getConnections() {
+        synchronized (conns) {
+            return conns.keySet().toArray(new Connection[conns.size()]);
+        }
     }
 }

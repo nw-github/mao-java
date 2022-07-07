@@ -4,44 +4,39 @@ import com.dog.game.Deck;
 import com.dog.net.Connection;
 
 public class Player {
-    private final Connection   mConn;
-    private final String       mName;
-    private final Deck         mCards    = new Deck();
-    private final int          mId;
-    private boolean            mIsDealer = false;
+    private final Deck       cards    = new Deck();
+    private final Connection conn;
+    private final String     name;
+    private final int        id;
+    private boolean          isDealer = false;
 
     public Player(Connection conn, int id, String name) {
-        mConn = conn;
-        mName = name;
-        mId   = id;
+        this.conn = conn;
+        this.name = name;
+        this.id   = id;
     }
 
     public Deck getCards() {
-        return mCards;
+        return cards;
     }
 
     public String getName() {
-        return mName;
+        return name;
     }
 
     public int getId() {
-        return mId;
+        return id;
     }
 
     public boolean isDealer() {
-        return mIsDealer;
+        return isDealer;
     }
 
     public Connection getConnection() {
-        return mConn;
+        return conn;
     }
 
-    public void setDealer(boolean isDealer) {
-        mIsDealer = isDealer;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("%d:%s:%d", getId(), getName(), getCards().size());
+    public void setIsDealer(boolean isDealer) {
+        this.isDealer = isDealer;
     }
 }

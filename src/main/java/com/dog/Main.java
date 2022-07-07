@@ -50,9 +50,8 @@ public class Main {
 
             @Override
             public void onGameStart(ClientGame game) {
-                System.out.printf("\n[Game Start] (%s of %s) (%d cards drawable)\n\t",
-                    game.getTopCard().face().toString(),
-                    game.getTopCard().suit().toString(),
+                System.out.printf("\n[Game Start] (%s) (%d cards drawable)\n\t",
+                    game.getDiscardTop().toString(),
                     game.getDrawDeck());
                 
                 for (var item : game.getPlayers().entrySet())
@@ -61,35 +60,33 @@ public class Main {
                 
                 printDeck();
 
-                if (game.getMyId() == 1)
-                    mClient.play(0, "");
+                if (game.getLocalId() == 1)
+                    mClient.play(game.getCards().get(0), "");
             }
 
             @Override
             public void onGameEnd(ClientPlayer winner) {
                 System.out.printf("Game over: %s wins!\n", winner.getName());
+
+                mClient.stop();
             }
 
             @Override
             public void onPlay(ClientPlayer player, String text, Card played) {
-                if (!mClient.getGameState().isMyPlayer(player)) {
-                    System.out.printf("%s played '%s of %s' onto '%s of %s' (now has %d cards)\n",
+                if (!mClient.getGame().isLocalPlayer(player)) {
+                    System.out.printf("%s played '%s' onto '%s' (now has %d cards)\n",
                         player.getName(),
-                        played.face().toString(),
-                        played.suit().toString(),
-                        mClient.getGameState().getTopCard().face().toString(),
-                        mClient.getGameState().getTopCard().suit().toString(),
+                        played.toString(),
+                        mClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
 
-                    mClient.play(0, "");
+                    mClient.play(mClient.getGame().getCards().get(0), "");
                 } else {
-                    System.out.printf("Played '%s of %s' onto '%s of %s' (now has %d cards)\n",
-                        played.face().toString(),
-                        played.suit().toString(),
-                        mClient.getGameState().getTopCard().face().toString(),
-                        mClient.getGameState().getTopCard().suit().toString(),
+                    System.out.printf("Played '%s' onto '%s' (now has %d cards)\n",
+                        played.toString(),
+                        mClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
@@ -99,13 +96,9 @@ public class Main {
             @Override
             public void onCardReceived(ClientPlayer player, Card card, String reason, int newSize) {
                 if (card != null) {
-                    System.out.printf("\t> Received '%s of %s' (now has %d cards)\n",
-                        card.face().toString(),
-                        card.suit().toString(),
-                        player.getCards());
+                    System.out.printf("\t> Received '%s' (now has %d cards)\n", card.toString(), player.getCards());
                 } else {
-                    System.out.printf("\t- Received a card (now has %d cards)\n",
-                        player.getCards());
+                    System.out.printf("\t- Received a card (now has %d cards)\n", player.getCards());
                 }
                 
                 if (!reason.isEmpty())
@@ -113,7 +106,7 @@ public class Main {
 
                 System.out.printf("\t\tDeck now has %d cards%s\n", 
                     newSize,
-                    newSize >= mClient.getGameState().getDrawDeck() ? " (was reshuffled)" : "");
+                    newSize >= mClient.getGame().getDrawDeck() ? " (was reshuffled)" : "");
             }
 
             @Override
@@ -123,8 +116,8 @@ public class Main {
 
             private void printDeck() {
                 System.out.printf("My cards: \n\t");
-                for (var card : mClient.getGameState().getCards())
-                    System.out.printf("%s of %s, ", card.face().toString(), card.suit().toString());
+                for (var card : mClient.getGame().getCards())
+                    System.out.printf("%s, ", card.toString());
                 System.out.printf("\n\n");
             }
         });

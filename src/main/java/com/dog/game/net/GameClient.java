@@ -2,73 +2,73 @@ package com.dog.game.net;
 
 import com.dog.game.Card;
 import com.dog.net.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class GameClient extends Client {
-    private final ClientHandler mHandler;
-    private final String mName;
-    private ClientGame mGame;
-    private boolean mGameStarted = false;
+    private final ClientHandler handler;
+    private final String name;
+    private ClientGame game;
+    private boolean gameStarted = false;
 
     public GameClient(String name, String host, int port, int maxAttempts, int timeout, ClientHandler handler) {
         super(host, port, maxAttempts, timeout);
         
-        mHandler = handler;
-        mHandler.create(this);
-        mName = name;
+        this.name    = name;
+        this.handler = handler;
+        this.handler.create(this);
     }
 
     @Override
     public void onConnect() {
-        send(new Message(ClientMessage.REGISTER).withString(mName));
+        send(new MessageBuilder(ClientMessage.REGISTER).withString(name).build());
     }
 
     @Override
     public synchronized void onRecvMessage(Connection source, Message message) {
         try {
+            var reader = new MessageReader(message);
+
             switch (ServerMessage.valueOf(message.type())) {
             case ACCEPTED: {
-                mGame = new ClientGame(message);
-                mHandler.onAccept(mGame);
+                handler.onAccept(game = reader.readJson(ClientGame.class));
             } break;
             case GAME_START: {
-                mGame = new ClientGame(message);
-                mGameStarted = true;
-                mHandler.onGameStart(mGame);
+                gameStarted = true;
+                handler.onGameStart(game = reader.readJson(ClientGame.class));
             } break;
             case GAME_END: {
-                mGameStarted = false;
-                mHandler.onGameEnd(mGame.getPlayer(message.readInt()));
+                gameStarted = false;
+                handler.onGameEnd(game.getPlayer(reader.readInt()));
             } break;
             case PLAYER_JOIN: {
-                mHandler.onPlayerJoin(mGame.addPlayer(message.readString()));
+                handler.onPlayerJoin(game.addPlayer(reader.readJson(ClientPlayer.class)));
             } break;
             case PLAYER_LEAVE: {
-                var player = mGame.removePlayer(message.readInt());
-                mGame.setDrawDeck(mGame.getDrawDeck() + player.getCards());
-                mHandler.onPlayerLeave(player);
+                var player = game.removePlayer(reader.readInt());
+                game.setDrawDeck(game.getDrawDeck() + player.getCards());
+                handler.onPlayerLeave(player);
             } break;
             case PLAY: {
-                var player  = mGame.getPlayer(message.readInt());
-                var text    = message.readString();
-                var card    = message.readString();
+                var player = game.getPlayer(reader.readInt());
+                var text   = reader.readString();
+                var card   = reader.readJson(Card.class);
+                game.removeCard(player, card);
 
-                mGame.removeCard(player, card);
-
-                var played = Card.fromString(card);
-                mHandler.onPlay(player, text, played);
-                mGame.setTopCard(played);
+                handler.onPlay(player, text, card);
+                game.setDiscardTop(card);
             } break;
             case RECV_CARD: {
-                var player  = mGame.getPlayer(message.readInt());
-                var card    = message.readString();
-                var reason  = message.readString();
-                var newSize = message.readInt();
+                var player  = game.getPlayer(reader.readInt());
+                var card    = reader.readJson(Card.class);
+                var reason  = reader.readString();
+                var newSize = reader.readInt();
 
-                mHandler.onCardReceived(player, mGame.addCard(player, card), reason, newSize);
-                mGame.setDrawDeck(newSize);
+                game.addCard(player, card);
+                handler.onCardReceived(player, card, reason, newSize);
+                game.setDrawDeck(newSize);
             } break;
             }
-        } catch (IllegalArgumentException | DeserializationException ex) {
+        } catch (IllegalArgumentException | DeserializationException | JsonProcessingException ex) {
             ex.printStackTrace(); // TODO
             
             stop();
@@ -77,28 +77,30 @@ public class GameClient extends Client {
 
     @Override
     public void onDisconnect() {
-        mHandler.onDisconnect();
+        handler.onDisconnect();
     }
 
-    public ClientGame getGameState() {
-        return mGame;
+    public ClientGame getGame() {
+        return game;
     }
 
-    public void play(int index, String text) {
-        if (!mGameStarted)
+    public void play(Card card, String text) {
+        if (!gameStarted)
             return;
 
-        send(new Message(ClientMessage.PLAY)
-            .withInt(index)
-            .withString(text));
+        send(new MessageBuilder(ClientMessage.PLAY)
+            .withJson(card)
+            .withString(text)
+            .build());
     }
 
     public void draw() {
-        if (!mGameStarted)
+        if (!gameStarted)
             return;
 
-        send(new Message(ClientMessage.PLAY)
+        send(new MessageBuilder(ClientMessage.PLAY)
             .withInt(-1)
-            .withString(""));
+            .withString("")
+            .build());
     }
 }

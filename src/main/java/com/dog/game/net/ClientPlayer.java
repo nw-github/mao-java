@@ -1,37 +1,42 @@
 package com.dog.game.net;
 
-public class ClientPlayer {
-    private final int mId;
-    private final String mName;
-    private int mCards;
+import com.fasterxml.jackson.annotation.JsonCreator;
 
-    public ClientPlayer(int id, String name, int cards) {
-        mId    = id;
-        mName  = name;
-        mCards = cards;
+public class ClientPlayer {
+    private final int id;
+    private final String name;
+    private int cards;
+
+    @JsonCreator
+    private ClientPlayer() { id = 0; name = null; cards = 0; }
+
+    public ClientPlayer(Player player) {
+        this.id    = player.getId();
+        this.name  = player.getName();
+        this.cards = player.getCards().size();
     }
 
     public String getName() {
-        return mName;
+        return name;
     }
 
     public int getId() {
-        return mId;
+        return id;
     }
 
     public int getCards() {
-        return mCards;
+        return cards;
     }
 
     public void setCards(int cards) {
-        mCards = cards;
+        this.cards = cards;
     }
 
     public void removeCard() {
-        mCards--;
+        cards--;
     }
 
     public void addCard() {
-        mCards++;
+        cards++;
     }
 }
