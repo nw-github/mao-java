@@ -21,11 +21,11 @@ public class Main {
         System.out.printf("Connecting to %s:%d with name '%s'...\n", host, port, name);
 
         var client = new GameClient(name, host, port, 5, 2000, new ClientHandler() {
-            GameClient mClient;
+            GameClient gameClient;
 
             @Override
             public void create(GameClient client) {
-                mClient = client;
+                this.gameClient = client;
             }
 
             @Override
@@ -61,32 +61,32 @@ public class Main {
                 printDeck();
 
                 if (game.getLocalId() == 1)
-                    mClient.play(game.getCards().get(0), "");
+                    gameClient.play(game.getCards().get(0), "");
             }
 
             @Override
             public void onGameEnd(ClientPlayer winner) {
                 System.out.printf("Game over: %s wins!\n", winner.getName());
 
-                mClient.stop();
+                gameClient.stop();
             }
 
             @Override
             public void onPlay(ClientPlayer player, String text, Card played) {
-                if (!mClient.getGame().isLocalPlayer(player)) {
+                if (!gameClient.getGame().isLocalPlayer(player)) {
                     System.out.printf("%s played '%s' onto '%s' (now has %d cards)\n",
                         player.getName(),
                         played.toString(),
-                        mClient.getGame().getDiscardTop().toString(),
+                        gameClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
 
-                    mClient.play(mClient.getGame().getCards().get(0), "");
+                    gameClient.play(gameClient.getGame().getCards().get(0), "");
                 } else {
                     System.out.printf("Played '%s' onto '%s' (now has %d cards)\n",
                         played.toString(),
-                        mClient.getGame().getDiscardTop().toString(),
+                        gameClient.getGame().getDiscardTop().toString(),
                         player.getCards());
                     if (!text.isEmpty())
                         System.out.printf("\t%s\n", text);
@@ -106,7 +106,7 @@ public class Main {
 
                 System.out.printf("\t\tDeck now has %d cards%s\n", 
                     newSize,
-                    newSize >= mClient.getGame().getDrawDeck() ? " (was reshuffled)" : "");
+                    newSize >= gameClient.getGame().getDrawDeck() ? " (was reshuffled)" : "");
             }
 
             @Override
@@ -116,7 +116,7 @@ public class Main {
 
             private void printDeck() {
                 System.out.printf("My cards: \n\t");
-                for (var card : mClient.getGame().getCards())
+                for (var card : gameClient.getGame().getCards())
                     System.out.printf("%s, ", card.toString());
                 System.out.printf("\n\n");
             }

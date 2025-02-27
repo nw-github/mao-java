@@ -27,7 +27,6 @@ public class Scene implements Screen {
         mBatch.setProjectionMatrix(mCamera.combined);
         mBatch.begin();
 
-
         mBatch.end();
     }
 

@@ -294,7 +294,7 @@ public class Game {
 
         userText = userText.toLowerCase().strip();
         for (var pair : replacements)
-            userText.replace(pair[0], pair[1]);
+            userText = userText.replace(pair[0], pair[1]);
 
         if (Utils.endsWithAny(userText, ".", "!", "?"))
             userText = userText.substring(0, userText.length() - 1);
